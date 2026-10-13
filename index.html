@@ -728,21 +728,112 @@ const STAR_IDS = new Set(["100.⑤", "101.ㄱ", "101.ㄷ", "102.ㄴ", "103.①",
    허브(모듈 선택) 화면은 개수만 필요하므로 데이터를 건드리지 않는다. */
 const MODULE_BUILDERS = {}; // 모듈 id → (rows) => 정규화된 배열
 const MODULE_PENDING = {}; // 모듈 id → Promise (같은 모듈을 두 번 받지 않는다)
+const MODULE_LOADERS = {}; // 모듈 id → () => Promise  (JSON 한 개로 안 되는 모듈)
 
 function ensureModuleData(id) {
+  const load = MODULE_LOADERS[id];
   const build = MODULE_BUILDERS[id];
-  if (!build) return Promise.resolve([]);
+  if (!load && !build) return Promise.resolve([]);
   if (!MODULE_PENDING[id]) {
-    MODULE_PENDING[id] = fetch('data/' + encodeURIComponent(id) + '.json').then(r => {
+    MODULE_PENDING[id] = (load ? load() : fetch('data/' + encodeURIComponent(id) + '.json').then(r => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
-    }).then(build).catch(err => {
+    }).then(build)).catch(err => {
       delete MODULE_PENDING[id];
       throw err;
     }); // 실패는 다시 시도할 수 있게 둔다
   }
   return MODULE_PENDING[id];
 }
+
+/* ── 회차별 모아풀기 ─────────────────────────────────────────
+   주제가 아니라 시험 회차로 묶어 푼다. 다섯 모듈을 한 풀에 합치므로 원문
+   id가 겹친다(물권법 001.① / 민법총칙 001.①). 앞에 모듈 약칭을 붙여
+   구분하고, 원본 위치는 srcMod·srcId로 들고 다닌다 — 수정·피드백은 그
+   원본 자리에 쓴다. 진도·오답은 이 가상 모듈 이름으로 따로 쌓인다.
+   회차 모아풀기는 모의시험 한 번이라 과목별 진도와 섞이지 않는 게 맞다.
+
+   회차의 정본이 둘로 나뉘어 있다.
+     · 25년 6·8·10모 → id가 SS로 시작하고, SS_EXAM_* 맵이 월을 적어 둔다
+     · 제15회 변시    → id 접두사 15V
+   SS인데 맵에 없는 것이 52지문 있다(채각 SS8~SS18·채총 SS23·물권 SS물청).
+   나중에 덧붙이면서 회차를 안 적은 것들이다. 버리면 25년 모의를 푼다면서
+   52지문이 조용히 빠지므로, 「회차 미표기」 칸에 모아 둔다. */
+const SESS_MODS = ["채권총론", "채권각론", "물권법", "민법총칙", "민사소송법"];
+const SESS_SHORT = {
+  채권총론: "채총",
+  채권각론: "채각",
+  물권법: "물권",
+  민법총칙: "민총",
+  민사소송법: "민소"
+};
+const SESS_LIST = [{
+  key: "25.06모",
+  label: "25년 6월 모의"
+}, {
+  key: "25.08모",
+  label: "25년 8월 모의"
+}, {
+  key: "25.10모",
+  label: "25년 10월 모의"
+}, {
+  key: "25모?",
+  label: "25년 모의 · 회차 미표기"
+}, {
+  key: "26변시",
+  label: "제15회 변시(26년)"
+}];
+// SS_EXAM_각론·SS_EXAM은 이 줄보다 아래에서 선언된다. 그래서 호출 시점에 읽는다.
+const ssExamOf = mod => ({
+  채권총론: SS_EXAM,
+  채권각론: SS_EXAM_각론,
+  물권법: SS_EXAM_물권,
+  민법총칙: SS_EXAM_민총,
+  민사소송법: SS_EXAM_민소
+})[mod] || {};
+function sessionOf(mod, rawId) {
+  const id = String(rawId);
+  const ss = id.match(/^SS([가-힣a-zA-Z]*\d+)\./);
+  if (ss) {
+    const raw = ssExamOf(mod)["SS" + ss[1]];
+    const m = raw && raw.match(/^(\d\d)\.(\d\d)모(?:-(\d+))?$/);
+    if (!m) return {
+      key: "25모?",
+      label: "25모 " + id.split(".")[0]
+    };
+    return {
+      key: `${m[1]}.${m[2]}모`,
+      label: `${m[1]}.${m[2]}모` + (m[3] ? "-" + m[3] : "")
+    };
+  }
+  const v15 = id.match(/^15V(\d+)\./);
+  if (v15) return {
+    key: "26변시",
+    label: "26변시-" + v15[1]
+  };
+  return null; // 과거 기출(숫자 id)·기타는 회차 모아풀기 대상이 아니다
+}
+let 회차모아_DATA = [];
+MODULE_LOADERS["회차모아"] = () => Promise.all(SESS_MODS.map(m => ensureModuleData(m))).then(() => {
+  const out = [];
+  for (const mod of SESS_MODS) {
+    const src = MODULE_REGISTRY.find(x => x.id === mod);
+    for (const q of src ? src.getData() : []) {
+      const s = sessionOf(mod, q.id);
+      if (!s) continue;
+      out.push({
+        ...q,
+        id: SESS_SHORT[mod] + "·" + q.id,
+        topic: s.key,
+        srcMod: mod,
+        srcId: String(q.id),
+        srcTopic: q.topic,
+        srcLabel: s.label
+      });
+    }
+  }
+  return 회차모아_DATA = out;
+});
 let 채권총론_DATA = [];
 MODULE_BUILDERS["채권총론"] = rows => 채권총론_DATA = rows.map(([id, q, a, e, t]) => normalizeStar({
   id,
@@ -885,6 +976,16 @@ const SS_EXAM_민총 = {
 // ── 모듈 레지스트리 ──────────────────────────────────
 // 새 퀴즈 추가 시 여기에 등록
 const MODULE_REGISTRY = [{
+  id: "회차모아",
+  label: "회차별 모아풀기",
+  subtitle: "25년 모의 · 제15회 변시",
+  icon: "📝",
+  count: 372,
+  status: "active",
+  color: "#c0873a",
+  topics: SESS_LIST,
+  getData: () => 회차모아_DATA
+}, {
   id: "채권총론",
   label: "채권총론",
   subtitle: "민법 채권총론",
@@ -1468,10 +1569,10 @@ const SS_EXAM = {
   "SS11": "25.06모-33",
   "SS12": "25.08모-06",
   "SS13": "25.10모-06",
-  "SS14": "25.06mo-31",
+  "SS14": "25.06모-31",
   "SS15": "25.06모-35",
   "SS16": "25.08모-07",
-  "SS17": "25.10mo-08",
+  "SS17": "25.10모-08",
   "SS18": "25.08모-08",
   "SS19": "25.08모-09",
   "SS21": "25.10모-10",
@@ -1961,6 +2062,11 @@ const TOPIC_ICONS = {
   "무효와취소": "🔄",
   "조건과기한": "⏳",
   "소멸시효": "⌛",
+  "25.06모": "🗓",
+  "25.08모": "🗓",
+  "25.10모": "🗓",
+  "25모?": "🗓",
+  "26변시": "📝",
   "채권의목적": "⚖",
   "채무불이행": "⚡",
   "손해배상": "💰",
@@ -2152,8 +2258,8 @@ function App() {
       await sw(K_UTIME(id), Date.now());
     }
 
-    // 첫 번째 활성 모듈 설정
-    const firstMod = MODULE_REGISTRY.find(m => m.status === "active");
+    // 첫 번째 활성 모듈 설정 (회차모아는 다섯 모듈을 다 받으므로 기본값으로 두지 않는다)
+    const firstMod = MODULE_REGISTRY.find(m => m.status === "active" && m.id !== "회차모아");
     if (firstMod) setActiveModule(firstMod.id);
 
     // 로그인하면 바로 이 과목의 모듈 화면으로 간다. 과목은 헤더에서 바꾼다 —
@@ -2234,13 +2340,19 @@ function App() {
     setSavedSession(fbSess || lsSess);
 
     // 수정본 (Firebase 공유)
-    const fbEdits = await fb.list(`edits/${mid}`);
+    // 회차모아는 문항이 남의 모듈에 산다. 수정본도 그 모듈에 있으므로
+    // 다섯 곳을 다 읽고 모아풀기용 id(약칭·원문id)로 다시 건다.
     const edits = {};
-    for (const ed of Object.values(fbEdits || {})) {
-      if (ed?.qid) edits[ed.qid] = {
-        question: ed.question,
-        explanation: ed.explanation
-      };
+    for (const em of mid === "회차모아" ? SESS_MODS : [mid]) {
+      const fbEdits = await fb.list(`edits/${em}`);
+      for (const ed of Object.values(fbEdits || {})) {
+        if (!ed?.qid) continue;
+        const key = mid === "회차모아" ? SESS_SHORT[em] + "·" + ed.qid : ed.qid;
+        edits[key] = {
+          question: ed.question,
+          explanation: ed.explanation
+        };
+      }
     }
     setUserEdits(edits);
   }
@@ -2732,15 +2844,17 @@ function App() {
   // ── 수정 저장 (Firebase 공유)
   async function submitEdit() {
     if (!editTarget) return;
-    const qid = editTarget.id;
-    const safeQid = toSafeId(String(qid));
+    const qid = editTarget.id; // 화면·userEdits용 키
+    const tMid = editTarget.srcMod || activeModule; // 저장은 원본 모듈에
+    const tQid = editTarget.srcId || String(qid);
+    const safeQid = toSafeId(tQid);
     try {
-      await fb.set(`edits/${activeModule}/${safeQid}`, {
+      await fb.set(`edits/${tMid}/${safeQid}`, {
         uid,
         ts: Date.now(),
         date: new Date().toLocaleDateString('ko-KR'),
-        qid: String(qid),
-        mid: activeModule,
+        qid: tQid,
+        mid: tMid,
         question: editQ.trim(),
         explanation: editE.trim(),
         original_q: editTarget.question,
@@ -2761,14 +2875,15 @@ function App() {
   }
 
   // ── 수정 원복
-  async function resetEdit(qid) {
+  async function resetEdit(q) {
     if (!window.confirm('원본으로 복원할까요?')) return;
-    const safeQid = toSafeId(String(qid));
-    await fb.set(`edits/${activeModule}/${safeQid}`, null);
+    const tMid = q.srcMod || activeModule;
+    const tQid = q.srcId || String(q.id);
+    await fb.set(`edits/${tMid}/${toSafeId(tQid)}`, null);
     const next = {
       ...userEdits
     };
-    delete next[qid];
+    delete next[q.id];
     setUserEdits(next);
   }
 
@@ -3098,6 +3213,11 @@ function App() {
         if (!isActive) return;
         setActiveModule(mod.id);
         loadModuleData(mod.id);
+        // 회차모아는 '전체'로 열면 네 회차가 뒤섞인다. 회차 선택을 먼저 보여준다.
+        if (mod.id === "회차모아") {
+          setCfgMode("topic");
+          setCfgTopics([]);
+        }
         setScreen("quiz");
         setInQuiz(false);
         setDone(false);
@@ -3207,7 +3327,7 @@ function App() {
   }, "⏱ 20s")), /*#__PURE__*/React.createElement("button", {
     className: `pill ${cfgMode === "topic" ? "act" : ""}`,
     onClick: () => setCfgMode("topic")
-  }, "주제 선택"), /*#__PURE__*/React.createElement("button", {
+  }, activeModule === "회차모아" ? "회차 선택" : "주제 선택"), /*#__PURE__*/React.createElement("button", {
     className: `pill star ${cfgMode === "star" ? "act" : ""}`,
     onClick: () => {
       setCfgMode("star");
@@ -3286,7 +3406,7 @@ function App() {
     className: "start-btn",
     disabled: !canStart,
     onClick: () => launchQuiz(cfgRound, cfgMode, cfgTopics)
-  }, canStart ? hasResume ? `▶ 이어풀기 (${(savedSession.queueIds || []).length - (savedSession.qidx || 0)}문제 남음)` : `▶ 시작 (${cfgMode === "rnd100" ? 100 : startCnt}문제)` : "주제를 선택하세요"), hasResume && /*#__PURE__*/React.createElement("button", {
+  }, canStart ? hasResume ? `▶ 이어풀기 (${(savedSession.queueIds || []).length - (savedSession.qidx || 0)}문제 남음)` : `▶ 시작 (${cfgMode === "rnd100" ? 100 : startCnt}문제)` : activeModule === "회차모아" ? "회차를 선택하세요" : "주제를 선택하세요"), hasResume && /*#__PURE__*/React.createElement("button", {
     className: "start-btn",
     style: {
       background: 'var(--sf2)',
@@ -3349,6 +3469,15 @@ function App() {
     }
   }, (() => {
     const id = String(cur.id);
+    if (cur.srcLabel) {
+      // 회차 모아풀기 — 회차는 이미 알고 있다. 원본이 어느 편 몇 번인지만 덧붙인다.
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "var(--red,#e05252)",
+          fontWeight: 600
+        }
+      }, cur.srcLabel), /*#__PURE__*/React.createElement("span", null, cur.srcMod, " ", cur.srcId));
+    }
     const ssMatch = id.match(/^SS([가-힣a-zA-Z]*\d+)\.(.+)$/);
     const v15Match = id.match(/^15V(\d+)\.(.+)$/);
     const numMatch = id.match(/^(\d+)\.(.+)$/);
@@ -3389,14 +3518,14 @@ function App() {
   }, "✏ 수정"), /*#__PURE__*/React.createElement("button", {
     className: "fb-btn",
     onClick: () => {
-      loadFeedbacks(cur.id, activeModule);
+      loadFeedbacks(cur.srcId || cur.id, cur.srcMod || activeModule);
       setFbOpen(true);
       setFbText("");
       setFbType("오류 제보");
     }
   }, "💬 피드백"), /*#__PURE__*/React.createElement("span", {
     className: "qcard-topic"
-  }, TOPIC_ICONS[cur.topic] || "📌", " ", getMod()?.topics.find(t => t.key === cur.topic)?.label || cur.topic)), (() => {
+  }, TOPIC_ICONS[cur.topic] || "📌", " ", cur.srcTopic || getMod()?.topics.find(t => t.key === cur.topic)?.label || cur.topic)), (() => {
     function stripPrefix(s) {
       return (s || '').replace(/^[ㄱ-ㅎ①-⑳⑴-⑽]\.?\s*/, '').trim();
     }
@@ -3515,7 +3644,7 @@ function App() {
       color: "var(--er)",
       borderColor: "var(--er)"
     },
-    onClick: () => resetEdit(editTarget.id)
+    onClick: () => resetEdit(editTarget)
   }, "원복"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -3566,7 +3695,7 @@ function App() {
   }, "취소"), /*#__PURE__*/React.createElement("button", {
     className: "fb-submit",
     disabled: fbLoading || !fbText.trim(),
-    onClick: () => submitFeedback(cur.id, activeModule)
+    onClick: () => submitFeedback(cur.srcId || cur.id, cur.srcMod || activeModule)
   }, fbLoading ? "저장 중..." : "제출")))), cfgMode === "rnd100" && answered === null && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
