@@ -827,14 +827,54 @@ const SS_EXAM_민총 = {"SS1":"25.08모-10","SS2":"25.08모-12","SS법인1":"25.
    한 묶음에 모아 놨기 때문이다. 그래서 전체 id 로 찾는다. */
 let 상법_DATA = [];
 let EXAM_YEAR_상법 = {};
+
+/* ── 상법 「푸는 방식」 ───────────────────────────────────────
+   같은 모듈 안에서 셋 중 하나로 푼다. 모듈을 과목마다 새로 만들지 않는다 —
+   허브가 두 배로 늘고 진도가 갈라지기 때문이다.
+     ox   : 김남훈 기출지문총정리 OX (단원별, 변시 지문만)
+     exam : 기말범위 OX (회차별, 변시 1~15회 + 모의 24~26) — 5지선다 선지를 OX 로 돌린 것
+     mc   : 5지선다 원문 (회차별) — 법무부·법전협 원본 문제지에서 뽑았다
+   id 가 서로 겹치지 않으므로(001.① / 변01-36 / 변01-36.①) 진도·오답이 섞이지 않는다. */
+let SANG_MODE = 'ox';
+let 상법5지_DATA = [], 상법기말_DATA = [], 상법_회차 = [];
+const SANG_MODE_LABEL = { ox:'OX · 단원별', exam:'OX · 기말범위', mc:'5지선다' };
+const SANG_DATA = () => SANG_MODE === 'mc' ? 상법5지_DATA
+                      : SANG_MODE === 'exam' ? 상법기말_DATA : 상법_DATA;
+const SANG_TOPICS_OX = [
+  {key:"상인",label:"상인"},{key:"상업사용인",label:"상업사용인"},{key:"상호",label:"상호"},
+  {key:"상업등기",label:"상업등기"},{key:"영업양도",label:"영업양도"},
+  {key:"상행위통칙",label:"상행위법 통칙"},{key:"상행위각칙",label:"상행위법 각칙"},
+  {key:"회사설립",label:"주식회사의 설립"},{key:"주식과주주",label:"주식과 주주"},
+  {key:"회사의기관",label:"회사의 기관"},{key:"기업재무",label:"기업재무"},
+  {key:"구조변경",label:"회사의 구조변경"},{key:"기타회사",label:"기타의 회사"},
+  {key:"어음수표행위",label:"어음·수표행위"},
+  {key:"어음수표상권리의발생",label:"어음·수표상 권리의 발생"},
+  {key:"어음수표상권리의이전",label:"어음·수표상 권리의 이전"},
+  {key:"어음수표상권리의소멸",label:"어음·수표상 권리의 소멸"},
+  {key:"보험법",label:"보험법"},
+];
+
+const 가져오기 = (f, fb) => fetch('data/' + encodeURIComponent(f))
+  .then(r => r.ok ? r.json() : fb).catch(() => fb);
+
 MODULE_LOADERS["상법"] = () =>
   Promise.all([
     fetch('data/상법.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
-    fetch('data/상법.exam.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
-  ]).then(([rows, exam]) => {
+    가져오기('상법.exam.json', {}),
+    가져오기('상법5지.json', []),
+    가져오기('상법기말OX.json', []),
+    가져오기('상법회차.json', []),
+  ]).then(([rows, exam, five, fin, rounds]) => {
     EXAM_YEAR_상법 = exam;
-    return (상법_DATA = rows.map(([id,q,a,e,t]) =>
-      normalizeStar({id,question:q,answer:a,explanation:e,topic:t,star:false})));
+    상법_회차 = rounds;
+    // 6번째 칸(선지)이 있으면 5지선다다. 없으면 기존 OX 와 같은 모양.
+    상법5지_DATA = five.map(([id,q,a,e,t,ch]) =>
+      normalizeStar({id,question:q,answer:a,explanation:e,topic:t,star:false,choices:ch}));
+    상법기말_DATA = fin.map(([id,q,a,e,t]) =>
+      normalizeStar({id,question:q,answer:a,explanation:e,topic:t,star:false}));
+    상법_DATA = rows.map(([id,q,a,e,t]) =>
+      normalizeStar({id,question:q,answer:a,explanation:e,topic:t,star:false}));
+    return SANG_DATA();
   });
 
 // ── 모듈 레지스트리 ──────────────────────────────────
@@ -999,29 +1039,16 @@ const MODULE_REGISTRY = [
     ],
     getData: () => 민소법_DATA,
   },
-  { id:"상법", label:"상법", subtitle:"김남훈 기출지문총정리", icon:"🏢",
-    count: 1414, status:"active", color:"#4a7c59",
-    topics:[
-      {key:"상인",                 label:"상인"},
-      {key:"상업사용인",           label:"상업사용인"},
-      {key:"상호",                 label:"상호"},
-      {key:"상업등기",             label:"상업등기"},
-      {key:"영업양도",             label:"영업양도"},
-      {key:"상행위통칙",           label:"상행위법 통칙"},
-      {key:"상행위각칙",           label:"상행위법 각칙"},
-      {key:"회사설립",             label:"주식회사의 설립"},
-      {key:"주식과주주",           label:"주식과 주주"},
-      {key:"회사의기관",           label:"회사의 기관"},
-      {key:"기업재무",             label:"기업재무"},
-      {key:"구조변경",             label:"회사의 구조변경"},
-      {key:"기타회사",             label:"기타의 회사"},
-      {key:"어음수표행위",         label:"어음·수표행위"},
-      {key:"어음수표상권리의발생", label:"어음·수표상 권리의 발생"},
-      {key:"어음수표상권리의이전", label:"어음·수표상 권리의 이전"},
-      {key:"어음수표상권리의소멸", label:"어음·수표상 권리의 소멸"},
-      {key:"보험법",               label:"보험법"},
-    ],
-    getData: () => 상법_DATA,
+  { id:"상법", label:"상법", icon:"🏢",
+    status:"active", color:"#4a7c59",
+    // 푸는 방식에 따라 주제축·문항수·설명이 통째로 바뀐다 → 게터로 둔다
+    get subtitle(){ return SANG_MODE === 'mc' ? '5지선다 · 변시+모의 기출'
+                        : SANG_MODE === 'exam' ? '기말범위 OX · 변시+모의'
+                        : '김남훈 기출지문총정리'; },
+    get count(){ const n = SANG_DATA().length;
+                 return n || (SANG_MODE === 'mc' ? 433 : SANG_MODE === 'exam' ? 2100 : 1414); },
+    get topics(){ return SANG_MODE === 'ox' ? SANG_TOPICS_OX : 상법_회차; },
+    getData: () => SANG_DATA(),
   },
 ];
 
@@ -1485,6 +1512,18 @@ html.light .subject-tab.on{color:#fff;}
 .ox:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 .ox.sel-o{background:var(--ok-bg);border-color:var(--ok);}
 .ox.sel-x{background:var(--er-bg);border-color:var(--er);}
+/* 5지선다 — 선지가 길어 세로로 쌓는다. 번호는 고정폭으로 왼쪽에 둔다. */
+.mc-row{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.mc-btn{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--bd);background:var(--sf2);color:var(--tx);font-size:14px;line-height:1.65;cursor:pointer;transition:all .15s cubic-bezier(.2,.8,.2,1);font-family:'Noto Sans KR',sans-serif;}
+.mc-btn:not(:disabled):hover{border-color:var(--blue);transform:translateY(-1px);}
+.mc-btn:disabled{cursor:default;}
+.mc-no{flex:0 0 auto;font-weight:700;color:var(--tx3);}
+.mc-tx{flex:1;}
+.mc-btn.sel{border-color:var(--blue);background:var(--sf);}
+.mc-btn.ans{border-color:var(--ok);background:var(--ok-bg);}
+.mc-btn.ans .mc-no{color:var(--ok);}
+.mc-btn.bad{border-color:var(--er);background:var(--er-bg);}
+.mc-btn.bad .mc-no{color:var(--er);}
 .next-btn{width:100%;padding:14px;background:var(--gf);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;transition:all .15s;letter-spacing:.2px;}
 .next-btn:hover{background:var(--gold);transform:translateY(-1px);box-shadow:0 6px 20px rgba(58,122,174,.2);}
 .back-btn{padding:6px 14px;border-radius:16px;border:1px solid var(--bd);background:var(--sf2);color:var(--tx3);font-size:12px;cursor:pointer;margin-bottom:14px;}
@@ -1615,6 +1654,16 @@ function App() {
   // ── 퀴즈 설정
   const [cfgRound,  setCfgRound]  = useState(1);
   const [cfgMode,   setCfgMode]   = useState("all");
+  // 상법 푸는 방식(OX 단원별 / 기말범위 OX / 5지선다). SANG_MODE 는 모듈 레지스트리의
+  // 게터가 읽으므로 화면 상태와 **같이** 바꿔야 한다.
+  const [sangMode, setSangMode] = useState(SANG_MODE);
+  function changeSangMode(m) {
+    SANG_MODE = m; setSangMode(m);
+    setCfgMode("all"); setCfgTopics([]);   // 주제축이 통째로 바뀐다
+    // ⚠ 이어풀기 세션은 회독·범위만 보고 맞춘다. 풀이방식을 바꾸면 남의 문제를
+    //   이어 푸는 꼴이 되므로(5지선다 큐를 OX 로 여는 일이 실제로 났다) 끊는다.
+    saveSession(null); setSavedSession(null);
+  }
   const [cfgTopics, setCfgTopics] = useState([]);
 
   // ── 퀴즈 진행
@@ -2085,7 +2134,15 @@ function App() {
   const tWrong   = (r,k) => getAll().filter(q=>(k==="15V" ? String(q.id).startsWith("15V") : q.topic===k)&&(wrongMap[r]||new Set()).has(q.id)).length;
   const tProg    = (r,k) => { const all=getAll().filter(q=> k==="15V" ? String(q.id).startsWith("15V") : q.topic===k); const ans=(progMap[r]?.answered||new Set()); const done=all.filter(q=>ans.has(q.id)).length; return {done, total:all.length, pct:all.length?Math.round(done/all.length*100):0}; };
   const TOTAL    = getAll().length;
-  const getProg  = r => { const p=progMap[r]||{answered:new Set()}; return { ans:p.answered.size, pct:Math.round(p.answered.size/Math.max(TOTAL,1)*100) }; };
+  // ⚠ 상법은 한 모듈 안에서 푸는 방식이 셋이고 진도는 id 로 섞여 쌓인다.
+  //   그래서 지금 방식에 **있는 id 만** 세야 100%를 넘지 않는다.
+  const CUR_IDS  = React.useMemo(() => new Set(getAll().map(q=>String(q.id))),
+                                 [activeModule, sangMode, TOTAL]);
+  const getProg  = r => {
+    const p = progMap[r] || {answered:new Set()};
+    let ans = 0; for (const id of p.answered) if (CUR_IDS.has(String(id))) ans++;
+    return { ans, pct: Math.round(ans/Math.max(TOTAL,1)*100) };
+  };
   const canStart = cfgMode !== "topic" || cfgTopics.length > 0;
   // 이어풀기 세션이 현재 설정과 매칭되는지 확인
   const hasResume = savedSession && savedSession.round===cfgRound && savedSession.mode===cfgMode
@@ -2462,6 +2519,23 @@ function App() {
                     ))}
                   </div>
                 </div>
+                {activeModule==="상법" && (
+                  <div className="card">
+                    <div className="card-title">🔀 푸는 방식</div>
+                    <div className="pill-row">
+                      {[["ox","OX · 단원별"],["exam","OX · 기말범위"],["mc","5지선다"]].map(([m,lb])=>(
+                        <button key={m} className={`pill ${sangMode===m?"act":""}`} onClick={()=>changeSangMode(m)}>
+                          {lb}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--tx3)",marginTop:8,lineHeight:1.6}}>
+                      {sangMode==="ox"   && "김남훈 기출지문총정리 — 단원별로 푼다. 변시 지문만 들어 있다."}
+                      {sangMode==="exam" && "기말범위 OX — 변시 1~15회 + 법전협 모의 2024~2026. 회차별로 푼다."}
+                      {sangMode==="mc"   && "5지선다 원문 — 법무부·법전협 원본 문제지. 회차별로 푼다."}
+                    </div>
+                  </div>
+                )}
                 <div className="card">
                   <div className="card-title">🎯 문제 범위</div>
                   <div className="pill-row">
@@ -2472,7 +2546,7 @@ function App() {
                       무작위 100문제 <span style={{fontSize:10,background:"rgba(248,113,113,.18)",color:"#f87171",borderRadius:5,padding:"1px 5px",marginLeft:3,fontWeight:700,letterSpacing:".02em"}}>⏱ 20s</span>
                     </button>
                     <button className={`pill ${cfgMode==="topic"?"act":""}`} onClick={()=>setCfgMode("topic")}>
-                      {activeModule==="회차모아" ? "회차 선택" : "주제 선택"}
+                      {(activeModule==="회차모아" || (activeModule==="상법" && sangMode!=="ox")) ? "회차 선택" : "주제 선택"}
                     </button>
                     <button className={`pill star ${cfgMode==="star"?"act":""}`} onClick={()=>{setCfgMode("star");setCfgTopics([]);}}>
                       ⭐ 중요문제 <span className="cnt-badge">{getAll().filter(q=>q.star).length}문제</span>
@@ -2565,7 +2639,15 @@ function App() {
                           return (<><span style={{color:"var(--red,#e05252)",fontWeight:600}}>{cur.srcLabel}</span><span>{cur.srcMod} {cur.srcId}</span></>);
                         }
                         if (activeModule === "상법") {
-                          // 상법은 한 통산번호 안에서도 회차가 갈려서 전체 id 로 찾는다.
+                          if (sangMode !== "ox") {
+                            // 5지선다·기말범위는 회차가 곧 주제다. id 는 '변01-36[.①]' 꼴.
+                            const lb = (상법_회차.find(t=>t.key===cur.topic)||{}).label || cur.topic;
+                            // ⚠ id 는 '변01-36' 또는 '모25-1-44[.①]' 꼴이라 회차 쪽에도 '-' 가 있다.
+                            //   가운데를 집으면 모의 회차 번호가 나온다 → 맨 뒤를 쓴다.
+                            const tail = id.split('-').pop();
+                            return (<><span style={{color:"var(--red,#e05252)",fontWeight:600}}>{lb}</span><span>문 {tail}</span></>);
+                          }
+                          // 상법 OX 는 한 통산번호 안에서도 회차가 갈려서 전체 id 로 찾는다.
                           const yr = EXAM_YEAR_상법[id] || "";
                           return (<>{yr && <span style={{color:"var(--blue)",fontWeight:600}}>{yr}</span>}<span>{id}</span></>);
                         }
@@ -2598,28 +2680,37 @@ function App() {
                   </div>
                   {(() => {
                   function stripPrefix(s) {
+                    // ⚠ 5지선다 합답형은 뒤쪽이 'ㄱ. …' 보기 묶음이다. 여기서 'ㄱ.' 을 떼면
+                    //   선지(①ㄱ, ㄴ)와 짝이 안 맞아 문제를 풀 수 없다. 그래서 그대로 둔다.
+                    if (cur.choices) return (s||'').trim();
                     return (s||'').replace(/^[ㄱ-ㅎ①-⑳⑴-⑽]\.?\s*/, '').trim();
                   }
+                  const qStyle = cur.choices ? {whiteSpace:"pre-line"} : undefined;
                   const parts = (cur.question || '').split('§');
                   if (parts.length >= 2) {
                     return (
                       <div>
                         <div className="fact-box">
-                          <div className="fact-label">🗂 사실관계</div>
+                          <div className="fact-label">{cur.choices ? "🗂 문제" : "🗂 사실관계"}</div>
                           {parts[0].trim()}
                         </div>
-                        <div className="question">{stripPrefix(parts[1])}</div>
+                        <div className="question" style={qStyle}>{stripPrefix(parts[1])}</div>
                       </div>
                     );
                   }
-                  return <div className="question">{stripPrefix(cur.question)}</div>;
+                  return <div className="question" style={qStyle}>{stripPrefix(cur.question)}</div>;
                 })()}
                   {answered !== null && (
                     <div className={`reveal ${answered}`}>
                       <div className="rv-label">
                         {answered==="ok"?"⭕":"❌"}
                         <span className="rv-verdict">
-                          {answered==="ok" ? `정답 (${cur.answer?"○ 옳은 지문":"× 틀린 지문"})` : `오답. 정답: ${cur.answer?"○ 옳은 지문":"× 틀린 지문"}`}
+                          {(() => {
+                            // 5지선다는 정답이 원문자, OX 는 참·거짓이라 표시가 다르다
+                            const a = cur.choices ? `${cur.answer}번`
+                                    : (cur.answer ? "○ 옳은 지문" : "× 틀린 지문");
+                            return answered==="ok" ? `정답 (${a})` : `오답. 정답: ${a}`;
+                          })()}
                         </span>
                       </div>
                       {showExp
@@ -2715,10 +2806,29 @@ function App() {
                     <CircleTimer timeLeft={timerLeft} />
                   </div>
                 )}
-                <div className="ox-row">
-                  <button className={`ox o ${userAns===true?"sel-o":""}`}  onClick={()=>handleAnswer(true)}  disabled={answered!==null}>○</button>
-                  <button className={`ox x ${userAns===false?"sel-x":""}`} onClick={()=>handleAnswer(false)} disabled={answered!==null}>✕</button>
-                </div>
+                {cur.choices ? (
+                  /* 5지선다 — 선지를 그대로 보여 준다. 실제 시험은 선지 순서를 바꿔 내므로
+                     ①~⑤ 번호가 아니라 **내용**으로 고르는 연습이 된다. */
+                  <div className="mc-row">
+                    {cur.choices.map(([ch, txt]) => {
+                      const sel = userAns === ch;
+                      const isAns = answered !== null && cur.answer === ch;
+                      return (
+                        <button key={ch}
+                          className={`mc-btn${sel?" sel":""}${isAns?" ans":""}${sel&&!isAns&&answered!==null?" bad":""}`}
+                          onClick={()=>handleAnswer(ch)} disabled={answered!==null}>
+                          <span className="mc-no">{ch}</span>
+                          <span className="mc-tx">{txt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="ox-row">
+                    <button className={`ox o ${userAns===true?"sel-o":""}`}  onClick={()=>handleAnswer(true)}  disabled={answered!==null}>○</button>
+                    <button className={`ox x ${userAns===false?"sel-x":""}`} onClick={()=>handleAnswer(false)} disabled={answered!==null}>✕</button>
+                  </div>
+                )}
                 {answered !== null && (
                   <button className="next-btn" onClick={handleNext}>{qidx+1<queue.length?"다음 문제 →":"결과 보기"}</button>
                 )}
