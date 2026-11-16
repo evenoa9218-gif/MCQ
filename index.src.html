@@ -2187,6 +2187,11 @@ function App() {
         date: new Date().toLocaleDateString('ko-KR'),
         qid: String(qid), mid,
       });
+      // 통합 의견함에도 같이 넣는다(허브 /feedback.js). 실패해도 여기 저장에는 영향이 없다.
+      try { window.LawFeedback && window.LawFeedback.send({
+        kind: /오류|이의/.test(fbType) ? "오류" : /보완|요청/.test(fbType) ? "제안" : "기타",
+        text: fbText.trim(), ctx: { qid: String(qid), mid: mid, type: fbType },
+      }).catch(function(){}); } catch (e) {}
       setFbText(""); setFbOpen(false);
       loadFeedbacks(qid, mid);
     } catch(e) { alert("피드백 저장 실패: " + e.message); }
@@ -3291,5 +3296,6 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<script src="/feedback.js?v=1" defer data-app="MCQ" data-button="off"></script>
 </body>
 </html>
