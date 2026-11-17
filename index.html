@@ -2011,6 +2011,11 @@ html.light .module-card.civ-proc{background:#e6f3fc;border:1px solid rgba(36,100
 .edit-btn:hover{border-color:var(--blue);color:var(--blue);}
 .edit-note{font-size:11.5px;color:var(--tx3);margin:-4px 0 10px;line-height:1.5;}
 .edit-note strong{color:var(--tx2);font-weight:700;}
+/* 긴 문제를 읽느라 내려가도 남은 시간이 보이게 헤더 바로 밑에 붙어 따라온다(--hdr-h 는 App 이 잰다). */
+.timer-row{display:flex;align-items:center;justify-content:center;gap:8px;width:fit-content;margin:0 auto 6px;padding:3px 14px 3px 6px;
+  position:sticky;top:calc(var(--hdr-h,0px) + 6px);z-index:50;background:var(--sf);border:1px solid var(--bd);border-radius:22px;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.timer-text{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;min-width:38px;}
+.timer-hint{font-size:11.5px;color:#d9960a;font-weight:600;}
 .edited-badge{font-size:9px;font-weight:700;color:var(--gold);background:rgba(106,171,200,.15);border:1px solid rgba(106,171,200,.3);border-radius:6px;padding:1px 5px;margin-left:5px;vertical-align:middle;}
 /* 피드백 목록 (퀴즈 카드 하단) */
 .fb-list{margin-top:12px;border-top:1px solid var(--bd2);padding-top:10px;}
@@ -2441,6 +2446,35 @@ const TOPIC_ICONS = {
 };
 
 // ── 메인 앱 ───────────────────────────────────────────
+/* ── 시간 제한 ────────────────────────────────────────────────
+   변호사시험 민사법 선택형은 70문항 120분이다. 검토·답안 표기에 10분을 떼고 문항 수로 나눈 것이
+   한 문항의 **평균**(T_AVG_Q), 그 1.5배가 **어려운 문제에 쓸 수 있는 상한**(T_MAX_Q)이다.
+   1.5배인 까닭: 세 문항 중 둘을 평균의 3/4 시간에 끝내면 남는 시간(평균의 1/2)이 나머지 하나에 간다.
+   OX 지문 하나는 5지선다 한 문항의 1/5 로 본다(선지 다섯 개를 하나씩 떼어 놓은 것이므로).
+   예전에는 「무작위 100문제」에만 20초 타이머가 있었다 — 그 20초가 바로 이 평균이다. */
+const EXAM_TIME = {
+  subject: '민사법',
+  n: 70,
+  min: 120,
+  reserve: 10
+};
+const T_AVG_Q = Math.round((EXAM_TIME.min - EXAM_TIME.reserve) * 60 / EXAM_TIME.n);
+const T_MAX_Q = Math.round(T_AVG_Q * 1.5);
+const T_AVG_OX = Math.round(T_AVG_Q / 5),
+  T_MAX_OX = Math.round(T_MAX_Q / 5);
+const fmtSec = s => s >= 60 ? `${Math.floor(s / 60)}분${s % 60 ? ' ' + s % 60 + '초' : ''}` : `${s}초`;
+const fmtClock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+// 한 문항의 제한 시간과 평균 시간(초). level: 'avg' 실전 평균 · 'max' 어려운 문제 상한
+const timeFor = (q, level) => {
+  const mc = !!(q && q.choices);
+  const avg = mc ? T_AVG_Q : T_AVG_OX,
+    max = mc ? T_MAX_Q : T_MAX_OX;
+  return {
+    limit: level === 'max' ? max : avg,
+    avg
+  };
+};
+
 /* 문항 수정 기록. 수정본은 Firebase `edits/<모듈>/<문항>` 한 칸에 최신판 하나만 있다.
    거기에 `log`(누가·언제·무엇을)를 덧붙여 간다. log 가 없는 옛 수정본은 그 칸의 uid·date 한 줄로 본다. */
 function editLogOf(ed) {
@@ -2547,6 +2581,31 @@ function App() {
   const [done, setDone] = useState(false);
   const [label, setLabel] = useState("");
   const [timerLeft, setTimerLeft] = useState(20);
+  // 시간 제한: off 끄기 · avg 실전 평균 · max 어려운 문제 상한. 기기에 기억해 둔다.
+  const [timerLevel, setTimerLevelRaw] = useState(() => {
+    try {
+      const v = localStorage.getItem('mcq_timer');
+      return v === 'avg' || v === 'max' ? v : 'off';
+    } catch {
+      return 'off';
+    }
+  });
+  const setTimerLevel = v => {
+    setTimerLevelRaw(v);
+    try {
+      localStorage.setItem('mcq_timer', v);
+    } catch {}
+  };
+  // 헤더 높이를 CSS 변수로 넘긴다 — 타이머가 붙을 자리. 좁은 화면에서는 헤더가 두세 줄이 되어 높이가 달라진다.
+  useEffect(() => {
+    const set = () => {
+      const h = document.querySelector('.hdr');
+      document.documentElement.style.setProperty('--hdr-h', (h ? h.offsetHeight : 0) + 'px');
+    };
+    set();
+    window.addEventListener('resize', set);
+    return () => window.removeEventListener('resize', set);
+  }, [uid, screen]);
   const timerRef = React.useRef(null);
   const qidxRef = React.useRef(0);
   const queueRef = React.useRef([]);
@@ -3191,13 +3250,17 @@ function App() {
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  // 「무작위 100문제」는 꺼 두어도 잰다(원래 그런 모드다) — 그때는 평균 페이스로.
+  const timed = cfgMode === "rnd100" || timerLevel !== "off";
+  const tLevel = timerLevel === "off" ? "avg" : timerLevel;
   useEffect(() => {
-    if (cfgMode !== "rnd100" || !inQuiz || done) {
+    if (!timed || !inQuiz || done) {
       clearInterval(timerRef.current);
       return;
     }
     clearInterval(timerRef.current);
-    setTimerLeft(20);
+    setTimerLeft(timeFor(queue[qidx], tLevel).limit);
     timerRef.current = setInterval(() => {
       setTimerLeft(t => {
         if (t <= 1) {
@@ -3208,7 +3271,7 @@ function App() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [qidx, inQuiz, cfgMode, done]);
+  }, [qidx, inQuiz, cfgMode, done, timerLevel, queue]);
 
   // 답변 시 타이머 정지
   useEffect(() => {
@@ -3217,7 +3280,7 @@ function App() {
 
   // 시간 초과 처리
   useEffect(() => {
-    if (timerLeft !== 0 || cfgMode !== "rnd100" || answered !== null || !inQuiz || done) return;
+    if (timerLeft !== 0 || !timed || answered !== null || !inQuiz || done) return;
     const cur = queue[qidx];
     if (!cur) return;
     // 오답 강제 처리
@@ -3252,7 +3315,8 @@ function App() {
       [ar]: nawm
     }));
     saveAwWrong(ar, nawm);
-    // 1.3초 후 자동 다음 문제
+    // 「무작위 100문제」만 1.3초 뒤 저절로 넘어간다. 그 밖에는 멈춰서 정답·해설을 볼 수 있게 둔다.
+    if (cfgMode !== "rnd100") return;
     setTimeout(() => {
       const nextIdx = qidxRef.current + 1;
       if (nextIdx >= queueRef.current.length) {
@@ -4284,6 +4348,32 @@ function App() {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card-title"
+  }, "⏱ 시간 제한"), /*#__PURE__*/React.createElement("div", {
+    className: "pill-row"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: `pill ${timerLevel === "off" ? "act" : ""}`,
+    onClick: () => setTimerLevel("off")
+  }, "끄기"), /*#__PURE__*/React.createElement("button", {
+    className: `pill ${timerLevel === "avg" ? "act" : ""}`,
+    onClick: () => setTimerLevel("avg")
+  }, "실전 평균 ", /*#__PURE__*/React.createElement("span", {
+    className: "cnt-badge"
+  }, "OX ", T_AVG_OX, "초 · 5지선다 ", fmtSec(T_AVG_Q))), /*#__PURE__*/React.createElement("button", {
+    className: `pill ${timerLevel === "max" ? "act" : ""}`,
+    onClick: () => setTimerLevel("max")
+  }, "어려운 문제 상한 ", /*#__PURE__*/React.createElement("span", {
+    className: "cnt-badge"
+  }, "OX ", T_MAX_OX, "초 · 5지선다 ", fmtSec(T_MAX_Q)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--tx3)",
+      marginTop: 8,
+      lineHeight: 1.7
+    }
+  }, "변호사시험 ", EXAM_TIME.subject, " 선택형은 ", EXAM_TIME.n, "문항 ", EXAM_TIME.min, "분입니다. 검토와 답안 표기에 ", EXAM_TIME.reserve, "분을 남기면 한 문항에 평균 ", fmtSec(T_AVG_Q), "를 쓸 수 있습니다.", " ", "세 문항 중 두 문항을 평균의 3/4 시간에 풀면 어려운 한 문항에는 ", fmtSec(T_MAX_Q), "까지 쓸 수 있습니다.", " ", "OX 지문 하나는 한 문항의 1/5로 계산했습니다(평균 ", T_AVG_OX, "초, 상한 ", T_MAX_OX, "초). 시간이 지나면 오답으로 처리됩니다.")), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "card-title"
   }, "🎯 문제 범위"), /*#__PURE__*/React.createElement("div", {
     className: "pill-row"
   }, /*#__PURE__*/React.createElement("button", {
@@ -4311,7 +4401,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: ".02em"
     }
-  }, "⏱ 20s")), /*#__PURE__*/React.createElement("button", {
+  }, "⏱ ", timeFor(null, tLevel).limit, "s")), /*#__PURE__*/React.createElement("button", {
     className: `pill ${cfgMode === "topic" ? "act" : ""}`,
     onClick: () => setCfgMode("topic")
   }, activeModule === "회차모아" || activeModule === "상법기말" && finAxis === "round" ? "회차 선택" : activeModule === "상법기말" ? "단원 선택" : "주제 선택"), /*#__PURE__*/React.createElement("button", {
@@ -4347,7 +4437,7 @@ function App() {
     style: {
       fontSize: 16
     }
-  }, "⏱"), /*#__PURE__*/React.createElement("span", null, "문제당 ", /*#__PURE__*/React.createElement("strong", null, "20초"), " 시간 제한이 적용됩니다. 시간 초과 시 자동으로 오답 처리됩니다.")), cfgMode === "topic" && getMod()?.topics && /*#__PURE__*/React.createElement("div", {
+  }, "⏱"), /*#__PURE__*/React.createElement("span", null, "문제당 ", /*#__PURE__*/React.createElement("strong", null, timeFor(null, tLevel).limit, "초"), " 시간 제한이 적용됩니다. 시간 초과 시 자동으로 오답 처리됩니다.")), cfgMode === "topic" && getMod()?.topics && /*#__PURE__*/React.createElement("div", {
     className: "topic-grid"
   }, getMod().topics.map(t => {
     const cnt = tCnt(t.key),
@@ -4582,7 +4672,7 @@ function App() {
   }, (() => {
     // 5지선다는 정답이 원문자, OX 는 참·거짓이라 표시가 다르다
     const a = cur.choices ? `${cur.answer}번` : cur.answer ? "○ 옳은 지문" : "× 틀린 지문";
-    return answered === "ok" ? `정답 (${a})` : `오답. 정답: ${a}`;
+    return answered === "ok" ? `정답 (${a})` : `${userAns === null ? "시간 초과" : "오답"}. 정답: ${a}`;
   })())), showExp ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "rv-exp"
   }, renderExp(cur.explanation)), /*#__PURE__*/React.createElement("span", {
@@ -4662,15 +4752,27 @@ function App() {
   }, "취소"), /*#__PURE__*/React.createElement("button", {
     className: "fb-submit",
     onClick: submitEdit
-  }, "저장"))))), cfgMode === "rnd100" && answered === null && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "center",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement(CircleTimer, {
-    timeLeft: timerLeft
-  })), cur.choices ?
+  }, "저장"))))), timed && answered === null && (() => {
+    const t = timeFor(cur, tLevel);
+
+    // 상한으로 잴 때는 평균 시간이 지난 뒤부터 노랗게 — '여기부터는 어려운 문제에 쓰는 시간'이라는 표시
+
+    const warnAt = tLevel === "max" ? t.limit - t.avg : Math.round(t.limit / 2);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "timer-row"
+    }, /*#__PURE__*/React.createElement(CircleTimer, {
+      timeLeft: timerLeft,
+      total: t.limit,
+      warnAt: warnAt
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "timer-text",
+      style: {
+        color: timerLeft <= 5 ? "#f87171" : timerLeft <= warnAt ? "#d9960a" : "var(--tx2)"
+      }
+    }, fmtClock(timerLeft)), tLevel === "max" && timerLeft <= warnAt && /*#__PURE__*/React.createElement("span", {
+      className: "timer-hint"
+    }, "평균 시간을 넘겼습니다"));
+  })(), cur.choices ?
   /*#__PURE__*/
   /* 5지선다 — 선지를 그대로 보여 준다. 실제 시험은 선지 순서를 바꿔 내므로
      ①~⑤ 번호가 아니라 **내용**으로 고르는 연습이 된다. */
@@ -5408,12 +5510,13 @@ function HubLink() {
 }
 function CircleTimer({
   timeLeft,
-  total = 20
+  total = 20,
+  warnAt = 10
 }) {
   const r = 13,
     circ = +(2 * Math.PI * r).toFixed(2);
   const offset = +(circ * (1 - timeLeft / total)).toFixed(2);
-  const color = timeLeft <= 5 ? '#f87171' : timeLeft <= 10 ? '#fbbf24' : 'var(--gold)';
+  const color = timeLeft <= 5 ? '#f87171' : timeLeft <= warnAt ? '#fbbf24' : 'var(--gold)';
   return /*#__PURE__*/React.createElement("svg", {
     width: "34",
     height: "34",
