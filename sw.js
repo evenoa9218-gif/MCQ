@@ -9,7 +9,7 @@
  * 그래서 **문서(navigate) 요청은 네트워크 우선**으로 바꿨다. 오프라인일 때만
  * 캐시가 답한다. 나머지 자산은 캐시 우선을 유지한다 — 잘 바뀌지 않기 때문이다.
  */
-const CACHE = 'ox-quiz-v9';   // v9: 해설·사실관계 문단 나눔(fmtLong)
+const CACHE = 'ox-quiz-v10';  // v10: 상법 기말대비 모듈 분리·다회독 플랜 — 문항 자료 모양이 바뀌어 옛 캐시를 비운다
 const ASSETS = [
   '/MCQ/',
   '/MCQ/index.html',
