@@ -891,7 +891,7 @@ MODULE_LOADERS["상법"] = () =>
   });
 
 MODULE_LOADERS["상법기말"] = () =>
-  Promise.all([받기('상법5지.json', 3), 받기('상법기말OX.json', 3), 가져오기('상법회차.json', [])])
+  Promise.all([받기('상법5지.json', 4), 받기('상법기말OX.json', 4), 가져오기('상법회차.json', [])])
     .then(([five, fin, rounds]) => {
       상법_회차 = rounds;
       // 5지선다: [id, 문제, 정답, 해설, 회차, 선지, 단원] / OX: [id, 지문, 정오, 해설, 회차, 단원]
@@ -1657,6 +1657,27 @@ html.light .subject-tab.on{color:#fff;}
 .ox.sel-x{background:var(--er-bg);border-color:var(--er);}
 /* 5지선다 — 선지가 길어 세로로 쌓는다. 번호는 고정폭으로 왼쪽에 둔다. */
 .mc-row{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+/* 선지·보기 바로 밑의 해설 상자. 왼쪽 띠 색이 그 지문의 정오다(초록 ○ / 빨강 ×). */
+.mc-item{display:flex;flex-direction:column;}
+.mc-btn.has-exp{border-bottom-left-radius:4px;border-bottom-right-radius:4px;}
+.ch-exp{display:flex;gap:10px;align-items:flex-start;margin:0 0 6px 12px;padding:10px 14px;border:1px solid var(--bd);border-top:none;border-left:3px solid var(--tx3);border-radius:0 0 10px 10px;background:var(--sf);font-size:14px;line-height:1.7;color:var(--tx2);text-align:left;}
+.ch-exp.o{border-left-color:var(--ok);}
+.ch-exp.x{border-left-color:var(--er);}
+.ch-exp-tag{flex:0 0 auto;font-size:15px;font-weight:800;line-height:1.55;}
+.ch-exp.o .ch-exp-tag{color:var(--ok);}
+.ch-exp.x .ch-exp-tag{color:var(--er);}
+.ch-exp-main{flex:1;min-width:0;word-break:keep-all;}
+.ch-exp-more{display:none;}
+.bogi-item{margin-bottom:8px;}
+.bogi-tx{white-space:pre-line;}
+.bogi-item .ch-exp{margin:6px 0 10px 0;border-top:1px solid var(--bd);border-radius:8px;}
+.rv-hint{font-size:11.5px;color:var(--tx3);margin-top:4px;}
+@media(max-width:700px){
+  .ch-exp{margin-left:6px;padding:8px 10px;gap:8px;font-size:13.5px;line-height:1.65;}
+  /* 폰: 긴 해설은 넉 줄 남짓만 보이고 아래가 흐려진다 — 「더 보기」로 편다 */
+  .ch-exp-body.clamp{max-height:7.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent);}
+  .ch-exp-more{display:inline-block;margin-top:2px;font-size:12px;color:var(--blue);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+}
 .mc-btn{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--bd);background:var(--sf2);color:var(--tx);font-size:14px;line-height:1.65;cursor:pointer;transition:all .15s cubic-bezier(.2,.8,.2,1);font-family:'Noto Sans KR',sans-serif;}
 .mc-btn:not(:disabled):hover{border-color:var(--blue);transform:translateY(-1px);}
 .mc-btn:disabled{cursor:default;}
@@ -1767,6 +1788,18 @@ const TOPIC_ICONS = {
   "채권의목적":"⚖","채무불이행":"⚡","손해배상":"💰","채권자지체":"⏰","채권자대위권":"🔗","채권자취소권":"✂","채권양도":"📤","채무인수":"📥","변제":"✅","대물변제":"🔄","상계":"↔","분할·불가분채권관계":"🔀","연대채무":"👥","보증채무":"🛡"};
 
 // ── 메인 앱 ───────────────────────────────────────────
+/* 5지선다 해설을 선지·보기별로 가른다. 조각은 '▸' 로 나뉘고 선지 해설은 '① (X) …', 보기 해설은 'ㄱ (O) …' 로 시작한다.
+   → byLabel: { '①': { ox: 'X', text } }, rest: 라벨 없는 조각(출처·문항 단위 해설)을 다시 이은 것 */
+function splitExp(exp) {
+  const byLabel = {}, rest = [];
+  for (const seg of String(exp || '').split(/\n?▸\s*/).filter(x => x.trim())) {
+    const m = seg.match(/^([①-⑤ㄱ-ㅎ])\s*\((O|X)\)\s*([\s\S]*)$/);
+    if (m && !byLabel[m[1]]) byLabel[m[1]] = { ox: m[2], text: m[3].trim() };
+    else rest.push(seg.trim());
+  }
+  return { byLabel, rest: rest.map(x => '▸ ' + x).join('\n') };
+}
+
 /* ── 시간 제한 ────────────────────────────────────────────────
    변호사시험 민사법 선택형은 70문항 120분이다. 검토·답안 표기에 10분을 떼고 문항 수로 나눈 것이
    한 문항의 **평균**(T_AVG_Q), 그 1.5배가 **어려운 문제에 쓸 수 있는 상한**(T_MAX_Q)이다.
@@ -1897,6 +1930,7 @@ function App() {
   // ── 문항 수정본 (공유)
   const [userEdits, setUserEdits] = useState({});
   const [editLogOpen, setEditLogOpen] = useState(false);   // 수정 기록 펼침
+  const [chOpen, setChOpen] = useState({});                // 폰에서 「더 보기」로 편 선지 해설
 
   // ── 이어풀기 세션
   const [savedSession, setSavedSession] = useState(null);
@@ -2288,7 +2322,7 @@ function App() {
     if (answered !== null) return;
     const cur = queue[qidx];
     const correct = choice === cur.answer;
-    setUserAns(choice); setAnswered(correct ? "ok" : "er"); setShowExp(false);
+    setUserAns(choice); setAnswered(correct ? "ok" : "er"); setShowExp(!!cur.choices);   // 5지선다는 해설을 바로 편다
     const r = cfgRound;
     const np = {
       answered: new Set([...(progMap[r]?.answered||[]), cur.id]),
@@ -2374,7 +2408,7 @@ function App() {
     const cur = queue[qidx];
     if (!cur) return;
     // 오답 강제 처리
-    setAnswered("er"); setUserAns(null); setShowExp(false);
+    setAnswered("er"); setUserAns(null); setShowExp(!!cur.choices);
     setSessErr(p => p + 1);
     const r = cfgRound;
     const np = {
@@ -2678,6 +2712,20 @@ function App() {
       return h('div', { key: i, style: { margin: i ? '5px 0 0' : 0, whiteSpace: 'pre-wrap',
         paddingLeft: li ? '1.3em' : 0, textIndent: li ? '-1.3em' : 0 } }, deco(s, key + '.' + i));
     }));
+  }
+
+  // 선지(보기) 하나의 해설 상자. 폰에서는 긴 해설을 몇 줄만 보이고 「더 보기」로 편다(CSS 가 폭을 보고 정한다).
+  function chExp(lab, e) {
+    const k = String(cur.id) + ':' + lab, long = e.text.length > 170, open = !!chOpen[k];
+    return (
+      <div className={`ch-exp ${e.ox === 'O' ? 'o' : 'x'}`}>
+        <span className="ch-exp-tag">{e.ox === 'O' ? '○' : '×'}</span>
+        <div className="ch-exp-main">
+          <div className={`ch-exp-body${long && !open ? ' clamp' : ''}`}>{renderExp(e.text)}</div>
+          {long && <span className="ch-exp-more" onClick={()=>setChOpen(o=>({...o,[k]:!open}))}>{open ? '접기 ▴' : '더 보기 ▾'}</span>}
+        </div>
+      </div>
+    );
   }
 
   function renderExp(exp) {
@@ -3215,7 +3263,23 @@ function App() {
                           <div className="fact-label">{cur.choices ? "🗂 문제" : "🗂 사실관계"}</div>
                           {fmtLong(parts[0].trim(), 'fact')}
                         </div>
-                        <div className="question" style={qStyle}>{stripPrefix(parts[1])}</div>
+                        {cur.choices ? (() => {
+                          // 합답형 — 보기(ㄱㄴㄷ)를 한 줄씩 가르고, 답한 뒤에는 보기마다 바로 밑에 해설을 단다
+                          const ex = answered !== null && showExp ? splitExp(cur.explanation).byLabel : {};
+                          return (
+                            <div className="question bogi-list">
+                              {parts[1].trim().split(/\n(?=[ㄱ-ㅎ]\.\s)/).map((line, i) => {
+                                const lab = (line.match(/^([ㄱ-ㅎ])\./) || [])[1];
+                                return (
+                                  <div key={i} className="bogi-item">
+                                    <div className="bogi-tx">{line}</div>
+                                    {lab && ex[lab] && chExp(lab, ex[lab])}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })() : <div className="question" style={qStyle}>{stripPrefix(parts[1])}</div>}
                       </div>
                     );
                   }
@@ -3235,7 +3299,9 @@ function App() {
                         </span>
                       </div>
                       {showExp
-                        ? <><div className="rv-exp">{renderExp(cur.explanation)}</div><span className="rv-toggle" onClick={()=>setShowExp(false)}>▴ 접기</span></>
+                        ? <><div className="rv-exp">{renderExp(cur.choices ? splitExp(cur.explanation).rest : cur.explanation)}
+                              {cur.choices && <div className="rv-hint">해설은 {cur.question.includes('§') ? '보기' : '선지'}마다 바로 아래에 있습니다.</div>}
+                            </div><span className="rv-toggle" onClick={()=>setShowExp(false)}>▴ 해설 접기</span></>
                         : <span className="rv-toggle" onClick={()=>setShowExp(true)}>▸ 해설 보기</span>
                       }
                       <div style={{marginTop:10}}>
@@ -3311,18 +3377,25 @@ function App() {
                   /* 5지선다 — 선지를 그대로 보여 준다. 실제 시험은 선지 순서를 바꿔 내므로
                      ①~⑤ 번호가 아니라 **내용**으로 고르는 연습이 된다. */
                   <div className="mc-row">
-                    {cur.choices.map(([ch, txt]) => {
-                      const sel = userAns === ch;
-                      const isAns = answered !== null && cur.answer === ch;
-                      return (
-                        <button key={ch}
-                          className={`mc-btn${sel?" sel":""}${isAns?" ans":""}${sel&&!isAns&&answered!==null?" bad":""}`}
-                          onClick={()=>handleAnswer(ch)} disabled={answered!==null}>
-                          <span className="mc-no">{ch}</span>
-                          <span className="mc-tx">{txt}</span>
-                        </button>
-                      );
-                    })}
+                    {(() => {
+                      // 답한 뒤에는 선지마다 바로 밑에 그 선지의 해설 — 위아래로 눈을 옮기지 않아도 되게
+                      const ex = answered !== null && showExp ? splitExp(cur.explanation).byLabel : {};
+                      return cur.choices.map(([ch, txt]) => {
+                        const sel = userAns === ch;
+                        const isAns = answered !== null && cur.answer === ch;
+                        return (
+                          <div key={ch} className="mc-item">
+                            <button
+                              className={`mc-btn${sel?" sel":""}${isAns?" ans":""}${sel&&!isAns&&answered!==null?" bad":""}${ex[ch]?" has-exp":""}`}
+                              onClick={()=>handleAnswer(ch)} disabled={answered!==null}>
+                              <span className="mc-no">{ch}</span>
+                              <span className="mc-tx">{txt}</span>
+                            </button>
+                            {ex[ch] && chExp(ch, ex[ch])}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 ) : (
                   <div className="ox-row">
