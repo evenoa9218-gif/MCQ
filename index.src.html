@@ -2358,6 +2358,41 @@ function App() {
   // 헤더의 민사법/형사법/공법 버튼이 맡는다. id가 없으면 위에서 허브로 보낸다.
   if (!uid) return <><style>{CSS}</style></>;
 
+  // ── 긴 해설·사실관계를 읽기 좋게 (보여 줄 때만 — 데이터는 그대로) ──────────
+  // 해설 ▸ 한 토막에 ①②③ 이 줄바꿈 없이 붙은 400자 넘는 벽글이 1,127곳이었다.
+  //   · ①②③ 앞에서 줄을 나누고 내어쓰기
+  //   · 그래도 380자가 넘으면 문장 끝(「다.」 등)에서 160자 이상씩 문단으로
+  //   · 판례 번호 「(2020도2642)」 「[2018다287522, 5월 판결]」 는 흐린 글씨로
+  // ⚠ 같은 함수가 index.src.html · index.html · criminal.html · public-law.html 네 곳에 있다.
+  function fmtLong(p, key) {
+    const h = React.createElement;
+    const CITE = /(\((?:대법원|대판|헌재)?\s*(?:\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*(?:선고|자)?\s*)?\d{2,4}[가-힣]{1,3}\d{2,7}[^()]{0,40}\)|\[\d{2,4}[가-힣]{1,3}\d{2,7}[^\[\]]{0,30}\])/g;
+    const deco = (t, k) => t.split(CITE).map((s, i) => i % 2
+      ? h('span', { key: k + ':' + i, style: { color: 'var(--tx3, #8a8a8a)', fontSize: '.92em' } }, s) : s);
+    if (p.length < 200 && p.indexOf('\n') < 0) return h('span', { key, style: { whiteSpace: 'pre-wrap' } }, deco(p, key));
+    const out = [];
+    p.split('\n').forEach((line) => {
+      const items = line.length > 150 ? line.split(/\s(?=[①-⑳]\s?\S)/) : [line];
+      // 「▸ ① …」처럼 머리 조각만 남으면 다음 줄에 붙인다
+      while (items.length > 1 && items[0].trim().length <= 2) items.splice(0, 2, items[0] + ' ' + items[1]);
+      items.forEach((it) => {
+        if (it.length <= 380) { out.push(it); return; }
+        const re = /(?:다|요|음|함|임|됨)\.["”’」』)]?\s+(?=\S)/g;
+        let st = 0, m;
+        while ((m = re.exec(it))) {
+          const cut = m.index + m[0].length;
+          if (cut - st >= 160 && it.length - cut >= 60) { out.push(it.slice(st, cut)); st = cut; }
+        }
+        out.push(it.slice(st));
+      });
+    });
+    return h('div', { key }, out.filter((s) => s.trim()).map((s, i) => {
+      const li = /^\s*[①-⑳]/.test(s);
+      return h('div', { key: i, style: { margin: i ? '5px 0 0' : 0, whiteSpace: 'pre-wrap',
+        paddingLeft: li ? '1.3em' : 0, textIndent: li ? '-1.3em' : 0 } }, deco(s, key + '.' + i));
+    }));
+  }
+
   function renderExp(exp) {
     if (!exp) return null;
     const boxStyle = {
@@ -2392,7 +2427,7 @@ function App() {
             const pt = p.trim();
             if (/^제\d+조/.test(pt) || /^\[법조문\]/.test(pt)) return <div key={pi} style={boxStyle}>{p}</div>;
             if (/^\[조문\]/.test(pt)) return <div key={pi} style={boxStyle}>{p.replace(/^\[조문\]\s*/,'')}</div>;
-            return <span key={pi} style={{whiteSpace:'pre-wrap'}}>{p}</span>;
+            return fmtLong(p, pi);
           })}
         </div>
       );
@@ -2697,7 +2732,7 @@ function App() {
                       <div>
                         <div className="fact-box">
                           <div className="fact-label">{cur.choices ? "🗂 문제" : "🗂 사실관계"}</div>
-                          {parts[0].trim()}
+                          {fmtLong(parts[0].trim(), 'fact')}
                         </div>
                         <div className="question" style={qStyle}>{stripPrefix(parts[1])}</div>
                       </div>
