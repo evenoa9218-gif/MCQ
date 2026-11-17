@@ -1,7 +1,7 @@
 {
-  "name": "3000제 OX 퀴즈",
-  "short_name": "OX 퀴즈",
-  "description": "변호사시험 민사법·형사법·공법 선택형 기출 OX 퀴즈",
+  "name": "선택형 대비",
+  "short_name": "선택형 대비",
+  "description": "변호사시험 민사법·형사법·공법 선택형 기출 대비",
   "start_url": "/MCQ/",
   "scope": "/MCQ/",
   "display": "standalone",
@@ -27,17 +27,17 @@
     {
       "name": "민사법",
       "url": "/MCQ/",
-      "description": "민사법 OX 퀴즈"
+      "description": "민사법 선택형 대비"
     },
     {
       "name": "형사법",
       "url": "/MCQ/criminal.html",
-      "description": "형사법 OX 퀴즈"
+      "description": "형사법 선택형 대비"
     },
     {
       "name": "공법",
       "url": "/MCQ/public-law.html",
-      "description": "공법 OX 퀴즈"
+      "description": "공법 선택형 대비"
     }
   ]
 }

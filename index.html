@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0f1117">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>3000제 OX 퀴즈 — 민법 & 민소법 선택형 기출</title>
+<title>선택형 대비 — 민법 & 민소법 선택형 기출</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
@@ -1545,6 +1545,27 @@ const MODULE_REGISTRY = [{
 
 // ── 스토리지 키 ──────────────────────────────────────
 const ADMIN_ID = "Sol";
+
+/* ── 첫 화면의 대분류 ──────────────────────────────────────────
+   카드를 한 줄로 늘어놓으면 채권총론·물권법이 '민법'이라는 게 안 보인다.
+   민법 / 민사소송법 / 상법으로 묶고, 민법 안은 채총 → 채각 → 민총 → 물권 순서로 둔다.
+   회차별 모아풀기는 민법·민소를 한꺼번에 푸는 것이라 어느 과목에도 넣지 않고 따로 둔다.
+   여기 안 적힌 모듈이 생기면 맨 끝 '기타' 줄에 모아 보여 준다 — 화면에서 조용히 사라지지 않게. */
+const HUB_GROUPS = (() => {
+  const plan = [["민법", ["채권총론", "채권각론", "민법총칙", "물권법"]], ["민사소송법", ["민사소송법"]], ["상법", ["상법", "상법기말"]], ["모아풀기", ["회차모아"]]];
+  const used = new Set(plan.flatMap(([, ids]) => ids));
+  const byId = id => MODULE_REGISTRY.find(m => m.id === id);
+  const groups = plan.map(([label, ids]) => ({
+    label,
+    mods: ids.map(byId).filter(Boolean)
+  }));
+  const rest = MODULE_REGISTRY.filter(m => !used.has(m.id));
+  if (rest.length) groups.push({
+    label: "기타",
+    mods: rest
+  });
+  return groups.filter(g => g.mods.length);
+})();
 const K_MODULE = (uid, mid) => `hub_${uid}_${mid}`;
 const K_USERS = "hub_userlist"; // shared: 전체 유저 목록
 const K_UTIME = uid => `hub_utime_${uid}`; // 마지막 접속 시각
@@ -2137,8 +2158,14 @@ html.light .subject-tab.on{color:#fff;}
 .login-hint{font-size:12px;color:rgba(230,240,255,.9);text-align:center;margin-top:10px;line-height:1.6;text-shadow:0 1px 5px rgba(0,0,0,.9);word-break:keep-all;}
 
 /* 허브 모듈 그리드 */
-.hub-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
-@media(max-width:700px){.hub-grid{grid-template-columns:repeat(2,1fr);}}
+.hub-group{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:stretch;margin-bottom:14px;}
+.hub-group-label{display:flex;align-items:center;justify-content:center;text-align:center;font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--tx);border-right:3px solid var(--gold);padding-right:12px;word-break:keep-all;}
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+@media(max-width:700px){
+  .hub-group{grid-template-columns:1fr;gap:8px;margin-bottom:18px;}
+  .hub-group-label{justify-content:flex-start;border-right:none;border-left:3px solid var(--gold);padding:2px 0 2px 10px;font-size:14px;}
+  .hub-grid{grid-template-columns:repeat(2,1fr);}
+}
 
 /* ── 모바일 전용 (세로 폰) ──────────────────────────── */
 @media(max-width:480px){
@@ -3755,7 +3782,7 @@ function App() {
     className: "hdr-left"
   }, /*#__PURE__*/React.createElement("div", {
     className: "hdr-title"
-  }, "⚖︎ OX 퀴즈"), /*#__PURE__*/React.createElement("div", {
+  }, "⚖︎ 선택형 대비"), /*#__PURE__*/React.createElement("div", {
     className: "hdr-sub"
   }, "민법 & 민소법 선택형 기출 최신빈출지문")), /*#__PURE__*/React.createElement("div", {
     className: "hdr-user"
@@ -3800,9 +3827,14 @@ function App() {
     className: "hub-notice"
   }, /*#__PURE__*/React.createElement("span", {
     className: "hub-notice-icon"
-  }, "📖"), /*#__PURE__*/React.createElement("span", null, "3000제 + 제 15회 변호사시험: 유니온 발췌. 오류 발견시 직접 수정 가능, 기타 이용자가 수정 불가한 문제를 발견한 경우나 원하는 기능 건의 등은 퀴즈 내 피드백 기능을 이용해주세요.")), /*#__PURE__*/React.createElement("div", {
+  }, "📖"), /*#__PURE__*/React.createElement("span", null, "3000제 + 제 15회 변호사시험: 유니온 발췌. 오류 발견시 직접 수정 가능, 기타 이용자가 수정 불가한 문제를 발견한 경우나 원하는 기능 건의 등은 퀴즈 내 피드백 기능을 이용해주세요.")), HUB_GROUPS.map(g => /*#__PURE__*/React.createElement("div", {
+    className: "hub-group",
+    key: g.label
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hub-group-label"
+  }, g.label), /*#__PURE__*/React.createElement("div", {
     className: "hub-grid"
-  }, MODULE_REGISTRY.map(mod => {
+  }, g.mods.map(mod => {
     const isActive = mod.status === "active";
     const hs = hubStats[mod.id] || {};
     const wc = hs.wc || 0;
@@ -3868,7 +3900,7 @@ function App() {
     })), /*#__PURE__*/React.createElement("div", {
       className: "module-prog-text"
     }, answered, "/", mod.count, " 풀이 (", pct, "%)")));
-  })))), screen === "quiz" && dataBusy && /*#__PURE__*/React.createElement("div", {
+  })))))), screen === "quiz" && dataBusy && /*#__PURE__*/React.createElement("div", {
     className: "su"
   }, /*#__PURE__*/React.createElement("div", {
     className: "card",
