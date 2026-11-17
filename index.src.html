@@ -1370,6 +1370,8 @@ html.light .module-card.civ-proc{background:#e6f3fc;border:1px solid rgba(36,100
 .fb-cancel:hover{border-color:var(--tx);color:var(--tx);}
 .edit-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;border:1px solid var(--bd);background:transparent;color:var(--tx3);font-size:11px;cursor:pointer;transition:all .15s;margin-right:4px;}
 .edit-btn:hover{border-color:var(--blue);color:var(--blue);}
+.edit-note{font-size:11.5px;color:var(--tx3);margin:-4px 0 10px;line-height:1.5;}
+.edit-note strong{color:var(--tx2);font-weight:700;}
 .edited-badge{font-size:9px;font-weight:700;color:var(--gold);background:rgba(106,171,200,.15);border:1px solid rgba(106,171,200,.3);border-radius:6px;padding:1px 5px;margin-left:5px;vertical-align:middle;}
 /* 피드백 목록 (퀴즈 카드 하단) */
 .fb-list{margin-top:12px;border-top:1px solid var(--bd2);padding-top:10px;}
@@ -1409,7 +1411,11 @@ html,body{background:var(--bg);color:var(--tx);font-family:'Pretendard Variable'
 .hdr-left{display:flex;flex-direction:column;}
 .hdr-title{font-family:'Noto Serif KR',serif;font-size:22px;font-weight:700;color:var(--tx);}
 .hdr-sub{font-family:'Noto Serif KR',serif;font-size:13px;color:var(--gold);margin-top:3px;font-weight:600;letter-spacing:.01em;}
-.hdr-user{display:flex;align-items:center;gap:8px;}
+.hdr-user{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;row-gap:6px;}
+/* 좁은 화면에서 오른쪽 단추들이 제목을 한 글자 폭으로 눌러 세로로 세우던 것을 막는다.
+   제목은 한 줄로 두고(줄어들지 않게), 단추 쪽이 줄을 바꾼다. 터치 기기가 아니어도 창이 좁으면 같다. */
+.hdr-left{flex-shrink:0;max-width:55%;}
+.hdr-title{white-space:nowrap;}
 .uid-badge{font-size:12px;color:var(--tx2);background:var(--sf2);border:1px solid var(--bd);border-radius:14px;padding:4px 12px;}
 /* 과목 전환 — 세 과목을 펼쳐 두고 지금 과목을 채워서 표시한다.
    헤더가 어두운 배경이라 밝은 글자·테두리를 쓴다. */
@@ -1460,7 +1466,8 @@ html.light .subject-tab.on{color:#fff;}
 .tab.act{color:var(--gold);background:var(--bg);border-color:var(--bd);border-bottom-color:var(--bg);margin-bottom:-1px;font-weight:700;}
 
 /* 메인 */
-.main{flex:1;padding:20px 16px;max-width:860px;margin:0 auto;width:100%;}
+/* 바닥 여백 80px: 오른쪽 아래에 떠 있는 「의견」 단추가 맨 아래 답 단추를 가리지 않도록, 끝까지 내리면 그 위로 올라오게 한다. */
+.main{flex:1;padding:20px 16px 80px;max-width:860px;margin:0 auto;width:100%;}
 .card{background:var(--sf);border:1px solid var(--bd);border-radius:16px;padding:22px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.18);}
 .card-title{font-size:11px;font-weight:700;color:var(--tx3);margin-bottom:16px;text-transform:uppercase;letter-spacing:.8px;}
 
@@ -1755,6 +1762,14 @@ const TOPIC_ICONS = {
   "채권의목적":"⚖","채무불이행":"⚡","손해배상":"💰","채권자지체":"⏰","채권자대위권":"🔗","채권자취소권":"✂","채권양도":"📤","채무인수":"📥","변제":"✅","대물변제":"🔄","상계":"↔","분할·불가분채권관계":"🔀","연대채무":"👥","보증채무":"🛡"};
 
 // ── 메인 앱 ───────────────────────────────────────────
+/* 문항 수정 기록. 수정본은 Firebase `edits/<모듈>/<문항>` 한 칸에 최신판 하나만 있다.
+   거기에 `log`(누가·언제·무엇을)를 덧붙여 간다. log 가 없는 옛 수정본은 그 칸의 uid·date 한 줄로 본다. */
+function editLogOf(ed) {
+  if (!ed) return [];
+  if (Array.isArray(ed.log) && ed.log.length) return ed.log.filter(Boolean);
+  return ed.uid ? [{ uid: ed.uid, date: ed.date || '' }] : [];
+}
+
 function App() {
   // ── 로그인/세션 상태
   // 저장된 id를 곧바로 읽어 시작한다. null로 시작하면 첫 그림이 반드시
@@ -1839,17 +1854,13 @@ function App() {
   const [archFilter,  setArchFilter]  = useState("wrong");
 
   // ── 피드백
-  const [fbOpen,    setFbOpen]    = useState(false);
-  const [fbType,    setFbType]    = useState("오류 제보");
-  const [fbText,    setFbText]    = useState("");
-  const [fbList,    setFbList]    = useState([]);  // 현재 문항 피드백
-  const [fbLoading, setFbLoading] = useState(false);
   const [archRound,   setArchRound]   = useState(1);
   const [awWrongMap,  setAwWrongMap]  = useState({});
   const [awMarkMap,   setAwMarkMap]   = useState({});
 
   // ── 문항 수정본 (공유)
   const [userEdits, setUserEdits] = useState({});
+  const [editLogOpen, setEditLogOpen] = useState(false);   // 수정 기록 펼침
 
   // ── 이어풀기 세션
   const [savedSession, setSavedSession] = useState(null);
@@ -2024,7 +2035,7 @@ function App() {
       for (const ed of Object.values(fbEdits||{})) {
         if (!ed?.qid) continue;
         const key = mid === "회차모아" ? SESS_SHORT[em] + "·" + ed.qid : ed.qid;
-        edits[key] = {question:ed.question, explanation:ed.explanation};
+        edits[key] = {question:ed.question, explanation:ed.explanation, uid:ed.uid, date:ed.date, restored:ed.restored, log:ed.log};
       }
     }
     setUserEdits(edits);
@@ -2196,7 +2207,6 @@ function App() {
 
     setQueue(finalQueue);
     setQidx(startIdx); setAnswered(null); setUserAns(null); setShowExp(false);
-    setFbList([]); setFbOpen(false);
     setSessCor(0); setSessErr(0); setSessMark(0);
     setDone(false); setLabel(lbl); setInQuiz(true); setScreen("quiz");
   }
@@ -2209,7 +2219,6 @@ function App() {
     saveSession(null); setSavedSession(null);
     setPlanRun(true);
     setQueue(q); setQidx(0); setAnswered(null); setUserAns(null); setShowExp(false);
-    setFbList([]); setFbOpen(false);
     setSessCor(0); setSessErr(0); setSessMark(0);
     setDone(false); setLabel(lbl); setInQuiz(true); setScreen("quiz");
   }
@@ -2292,7 +2301,6 @@ function App() {
       const nextIdx = qidx+1;
       setQidx(nextIdx);
       setAnswered(null); setUserAns(null); setShowExp(false);
-      setFbList([]); setFbOpen(false);
       // 세션 qidx 갱신
       if (savedSession) {
         const updated = {...savedSession, qidx: nextIdx};
@@ -2349,7 +2357,7 @@ function App() {
         setDone(true); saveSession(null); setSavedSession(null);
       } else {
         setQidx(nextIdx); setAnswered(null); setUserAns(null);
-        setShowExp(false); setFbList([]); setFbOpen(false);
+        setShowExp(false);
       }
     }, 1300);
   }, [timerLeft]); // eslint-disable-line
@@ -2413,6 +2421,13 @@ function App() {
   const startCnt = cfgMode==="all" ? TOTAL : cfgMode==="rnd100" ? 100 : cfgMode==="topic" ? getAll().filter(q=>cfgTopics.includes(q.topic)).length : cfgMode==="wrong+marked" ? wmCnt(cfgRound) : 0;
   const cur      = applyEdit(queue[qidx]);
   const curMark  = cur && (markedMap[cfgRound]||new Set()).has(cur.id);
+  // 의견함(오른쪽 아래)으로 보낼 때 지금 보던 문항을 같이 실어 보낸다 —
+  // '어느 문제가 틀렸다'를 따로 적지 않아도 관리자가 바로 찾을 수 있게.
+  window.FEEDBACK_CONTEXT = () => ({
+    module: activeModule || null, screen, round: cfgRound,
+    qid: inQuiz && !done && cur ? String(cur.srcId || cur.id) : null,
+    srcMod: (inQuiz && !done && cur && cur.srcMod) || undefined,
+  });
 
   // 아카이브 표시
   const archItems = r => {
@@ -2423,41 +2438,6 @@ function App() {
   };
 
   // 관리자 유저 목록 로드
-  // ── 피드백 로드 (현재 문항)
-  async function loadFeedbacks(qid, mid) {
-    try {
-      const data = await fb.list(`feedbacks/${mid}/${toSafeId(String(qid))}`);
-      const items = Object.values(data||{})
-        .filter(Boolean)
-        .sort((a,b)=>(b.ts||0)-(a.ts||0));
-      setFbList(items);
-    } catch { setFbList([]); }
-  }
-
-  // ── 피드백 제출
-  async function submitFeedback(qid, mid) {
-    if (!fbText.trim()) return;
-    setFbLoading(true);
-    try {
-      const key = Date.now().toString();
-      const safeQid = toSafeId(String(qid));
-      await fb.set(`feedbacks/${mid}/${safeQid}/${key}`, {
-        uid, type: fbType, text: fbText.trim(),
-        ts: Date.now(),
-        date: new Date().toLocaleDateString('ko-KR'),
-        qid: String(qid), mid,
-      });
-      // 통합 의견함에도 같이 넣는다(허브 /feedback.js). 실패해도 여기 저장에는 영향이 없다.
-      try { window.LawFeedback && window.LawFeedback.send({
-        kind: /오류|이의/.test(fbType) ? "오류" : /보완|요청/.test(fbType) ? "제안" : "기타",
-        text: fbText.trim(), ctx: { qid: String(qid), mid: mid, type: fbType },
-      }).catch(function(){}); } catch (e) {}
-      setFbText(""); setFbOpen(false);
-      loadFeedbacks(qid, mid);
-    } catch(e) { alert("피드백 저장 실패: " + e.message); }
-    setFbLoading(false);
-  }
-
   // ── 피드백 전체 로드 (관리자)
   // ── 문제 수정 열기
   function openEdit(q) {
@@ -2475,17 +2455,18 @@ function App() {
     const tMid = editTarget.srcMod || activeModule;          // 저장은 원본 모듈에
     const tQid = editTarget.srcId  || String(qid);
     const safeQid = toSafeId(tQid);
+    const stamp = { uid, ts: Date.now(), date: new Date().toLocaleDateString('ko-KR') };
+    const log = [...editLogOf(userEdits[qid]), stamp];      // 앞사람들의 기록 뒤에 내 것을 붙인다
     try {
       await fb.set(`edits/${tMid}/${safeQid}`, {
-        uid, ts: Date.now(),
-        date: new Date().toLocaleDateString('ko-KR'),
+        ...stamp, log,
         qid: tQid, mid: tMid,
         question: editQ.trim(),
         explanation: editE.trim(),
         original_q: editTarget.question,
         original_e: editTarget.explanation,
       });
-      const next = {...userEdits, [qid]: {question:editQ.trim(), explanation:editE.trim()}};
+      const next = {...userEdits, [qid]: {question:editQ.trim(), explanation:editE.trim(), uid, date: stamp.date, log}};
       setUserEdits(next);
       setEditOpen(false);
     } catch(e) { alert('수정 저장 실패: ' + e.message); }
@@ -2493,11 +2474,17 @@ function App() {
 
   // ── 수정 원복
   async function resetEdit(q) {
-    if (!window.confirm('원본으로 복원할까요?')) return;
+    const cur0 = userEdits[q.id];
+    if (!cur0 || (cur0.question == null && cur0.explanation == null)) { setEditOpen(false); return; }   // 고친 적이 없다
+    if (!window.confirm('원본으로 복원하시겠습니까?')) return;
     const tMid = q.srcMod || activeModule;
     const tQid = q.srcId  || String(q.id);
-    await fb.set(`edits/${tMid}/${toSafeId(tQid)}`, null);
-    const next = {...userEdits}; delete next[q.id]; setUserEdits(next);
+    // 지우지 않고 '복원했다'는 기록을 남긴다 — 누가 언제 되돌렸는지도 모두에게 보여야 한다.
+    const stamp = { uid, ts: Date.now(), date: new Date().toLocaleDateString('ko-KR') };
+    const log = [...editLogOf(userEdits[q.id]), { ...stamp, act: '복원' }];
+    await fb.set(`edits/${tMid}/${toSafeId(tQid)}`, { ...stamp, qid: tQid, mid: tMid, restored: true, log });
+    setUserEdits({ ...userEdits, [q.id]: { uid, date: stamp.date, restored: true, log } });
+    setEditOpen(false);
   }
 
   // ── 관리자: 전체 수정 내역 로드
@@ -2739,10 +2726,6 @@ function App() {
           <div className="su">
             <div style={{marginBottom:14}}>
               <div className="card-title">학습 범위 선택</div>
-              <div className="hub-notice">
-                <span className="hub-notice-icon">📖</span>
-                <span>3000제 + 제 15회 변호사시험: 유니온 발췌. 오류 발견시 직접 수정 가능, 기타 이용자가 수정 불가한 문제를 발견한 경우나 원하는 기능 건의 등은 퀴즈 내 피드백 기능을 이용해주세요.</span>
-              </div>
               {/* 대분류(민법·민사소송법·상법)마다 한 줄 — 왼쪽에 분류 이름, 오른쪽에 그 과목 카드 */}
               {HUB_GROUPS.map(g => (
               <div className="hub-group" key={g.label}>
@@ -3132,11 +3115,32 @@ function App() {
                     <button className="edit-btn" onClick={()=>openEdit(cur)}>
                       ✏ 수정
                     </button>
-                    <button className="fb-btn" onClick={()=>{ loadFeedbacks(cur.srcId||cur.id, cur.srcMod||activeModule); setFbOpen(true); setFbText(""); setFbType("오류 제보"); }}>
-                      💬 피드백
-                    </button>
                     <span className="qcard-topic">{TOPIC_ICONS[cur.unit||cur.topic]||"📌"} {cur.srcTopic || (cur.unit && SANG_TOPICS_OX.find(t=>t.key===cur.unit)?.label) || getMod()?.topics.find(t=>t.key===cur.topic)?.label || cur.topic}</span>
                   </div>
+                  {(() => {
+                    // 수정 기록 — 누가 고쳤는지 모든 이용자에게 보인다
+                    const log = editLogOf(userEdits[cur.id]);
+                    if (!log.length) return null;
+                    const last = log[log.length - 1];
+                    const what = l => l.act === '복원' ? '원본으로 복원하였습니다' : '수정하였습니다';
+                    return (
+                      <div className="edit-note">
+                        <span>{last.act === '복원' ? '↩' : '✏'} <strong>{last.uid}</strong>님이 {what(last)}{last.date ? ` · ${last.date}` : ''}</span>
+                        {log.length > 1 && (
+                          <span style={{marginLeft:8,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setEditLogOpen(o=>!o)}>
+                            {editLogOpen ? '기록 접기' : `수정 기록 ${log.length}건`}
+                          </span>
+                        )}
+                        {editLogOpen && log.length > 1 && (
+                          <div style={{marginTop:4,lineHeight:1.7}}>
+                            {log.slice().reverse().map((l,i)=>(
+                              <div key={i}>{l.date} · {l.uid}님이 {what(l)}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {(() => {
                   function stripPrefix(s) {
                     // ⚠ 5지선다 합답형은 뒤쪽이 'ㄱ. …' 보기 묶음이다. 여기서 'ㄱ.' 을 떼면
@@ -3183,29 +3187,7 @@ function App() {
                       </div>
                     </div>
                   )}
-                  {/* 피드백 목록 - 정답 확인 후 표시 */}
-                  {fbList.length > 0 && answered !== null && (
-                    <div className="fb-list">
-                      <div style={{fontSize:11,color:"var(--tx3)",marginBottom:8,fontWeight:700}}>💬 이 문항 피드백 {fbList.length}건</div>
-                      {fbList.slice(0,3).map((f,i)=>(
-                        <div key={i} className="fb-item">
-                          <div className="fb-item-head">
-                            <span className="fb-item-type">{f.type}</span>
-                            <span className="fb-item-uid">👤 {f.uid}</span>
-                            <span className="fb-item-date">{f.date}</span>
-                          </div>
-                          <div className="fb-item-body">{f.text}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
-                {/* 퀴즈 화면 외 플로팅 피드백 버튼 */}
-                {!(inQuiz && !done) && (
-                  <button className="fb-float-btn" onClick={()=>{ setFbOpen(true); setFbText(""); setFbType("일반 피드백"); }}>
-                    💬 피드백
-                  </button>
-                )}
 
                 {/* 수정 모달 */}
                 {editOpen && editTarget && (
@@ -3213,7 +3195,7 @@ function App() {
                     <div className="fb-modal" onClick={e=>e.stopPropagation()}>
                       <div className="fb-modal-title">✏ 문제 수정</div>
                       <div className="fb-modal-sub" style={{marginBottom:14,fontSize:11,color:"var(--tx3)"}}>
-                        수정 내용은 모든 이용자에게 즉시 반영됩니다.
+                        수정 내용은 모든 이용자에게 반영되고, 수정한 분의 아이디가 기록으로 남습니다.
                       </div>
                       <div style={{fontSize:12,color:"var(--tx2)",marginBottom:6,fontWeight:600}}>문제</div>
                       <textarea className="fb-textarea" rows={5} value={editQ}
@@ -3233,33 +3215,6 @@ function App() {
                   </div>
                 )}
 
-                {/* 피드백 모달 */}
-                {fbOpen && (
-                  <div className="fb-overlay" onClick={e=>{if(e.target===e.currentTarget)setFbOpen(false);}}>
-                    <div className="fb-modal">
-                      <div className="fb-modal-title">💬 피드백 작성</div>
-                      <div className="fb-modal-sub">No.{cur.id} · {getMod()?.topics.find(t=>t.key===cur.topic)?.label||cur.topic}</div>
-                      <div className="fb-qref">{(cur.question||'').split('§').pop().trim().slice(0,100)}...</div>
-                      <div style={{fontSize:11,color:"var(--tx3)",marginBottom:8}}>유형 선택</div>
-                      <div className="fb-select-row">
-                        {["오류 제보","정답 이의","해설 보완","기능 요청","기타"].map(t=>(
-                          <button key={t} className={`fb-type ${fbType===t?"sel":""}`} onClick={()=>setFbType(t)}>{t}</button>
-                        ))}
-                      </div>
-                      <textarea className="fb-textarea" rows={4}
-                        placeholder="내용을 입력해주세요..."
-                        value={fbText}
-                        onChange={e=>setFbText(e.target.value)}/>
-                      <div className="fb-row">
-                        <button className="fb-cancel" onClick={()=>setFbOpen(false)}>취소</button>
-                        <button className="fb-submit" disabled={fbLoading||!fbText.trim()}
-                          onClick={()=>submitFeedback(cur.srcId||cur.id, cur.srcMod||activeModule)}>
-                          {fbLoading?"저장 중...":"제출"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
                 {cfgMode === "rnd100" && answered === null && (
                   <div style={{display:"flex",justifyContent:"center",marginBottom:4}}>
                     <CircleTimer timeLeft={timerLeft} />
@@ -3785,6 +3740,6 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
-<script src="/feedback.js?v=3" defer data-app="MCQ" data-button="off"></script>
+<script src="/feedback.js?v=3" defer data-app="MCQ"></script>
 </body>
 </html>
