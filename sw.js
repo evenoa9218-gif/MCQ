@@ -9,7 +9,7 @@
  * 그래서 **문서(navigate) 요청은 네트워크 우선**으로 바꿨다. 오프라인일 때만
  * 캐시가 답한다. 나머지 자산은 캐시 우선을 유지한다 — 잘 바뀌지 않기 때문이다.
  */
-const CACHE = 'ox-quiz-v10';  // v10: 상법 기말대비 모듈 분리·다회독 플랜 — 문항 자료 모양이 바뀌어 옛 캐시를 비운다
+const CACHE = 'ox-quiz-v11';  // v11: 새로고침 버튼 — 문항 데이터는 늘 서버에 새 판을 물어본다
 const ASSETS = [
   '/MCQ/',
   '/MCQ/index.html',
@@ -57,7 +57,9 @@ self.addEventListener('fetch', e => {
   if (req.url.includes('/MCQ/data/')) {
     e.respondWith(
       caches.match(req).then(cached => {
-        const fresh = fetch(req).then(res => {
+        // no-cache: 브라우저 HTTP 캐시를 믿지 않고 서버에 바뀌었는지 물어본다(안 바뀌었으면 304 로 끝난다).
+        // GitHub Pages 가 max-age=600 을 붙여서, 이게 없으면 배포 뒤 10분 동안 옛 문항이 다시 캐시된다.
+        const fresh = fetch(req, { cache: 'no-cache' }).then(res => {
           if (res.ok) {
             const clone = res.clone();
             caches.open(CACHE).then(c => c.put(req, clone));
