@@ -519,6 +519,40 @@ html,body{background:var(--bg);color:var(--tx);font-family:'Pretendard Variable'
    제목은 한 줄로 두고(줄어들지 않게), 단추 쪽이 줄을 바꾼다. 터치 기기가 아니어도 창이 좁으면 같다. */
 .hdr-left{flex-shrink:0;max-width:55%;}
 .hdr-title{white-space:nowrap;}
+/* 폰(≤700px): 머리를 두 줄로 정돈한다.
+     첫 줄  — 제목 | 테마 · 새로고침 · ◀앱
+     둘째 줄 — 과목 탭 | 아이디 · 로그아웃
+   전에는 오른쪽 단추 일곱 개가 세 줄로 접히고 부제목이 '…기출 최 / 신빈출지문' 으로 꺾였다.
+   .hdr-user 를 display:contents 로 풀어 단추들을 헤더의 직접 자식처럼 놓고, ::after 를 줄바꿈으로 쓴다. */
+@media(max-width:700px){
+  .hdr{flex-wrap:wrap;padding:10px 14px;gap:6px 8px;}
+  .hdr-left{order:1;flex:1 1 0;min-width:0;max-width:none;}
+  .hdr-title{font-size:19px;overflow:hidden;text-overflow:ellipsis;}
+  .hdr-sub{display:none;}
+  .hdr-user{display:contents;}
+  .hdr-user > .theme-toggle,.hdr-user > .hub-link{order:2;}
+  .hdr::after{content:"";order:3;flex:0 0 100%;height:0;}
+  .hdr-user > .subject-tabs{order:4;margin-right:auto;}
+  .hdr-user > .uid-badge{order:5;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hdr-user > .logout-btn{order:6;}
+  /* 회독 단추 넷을 한 줄에(전에는 4회독만 아랫줄로 떨어졌다) */
+  .pill-row.rounds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .pill-row.rounds .pill{flex-direction:column;justify-content:center;gap:2px;padding-left:4px;padding-right:4px;}
+  body .topic-grid{grid-template-columns:repeat(2,1fr);} /* (뒤에 나오는 기본 규칙을 이기려고 body 를 붙였다) 단원·주제 칸을 두 줄로 — 한 줄씩이면 끝없이 내려간다 */
+  body .rv-exp{text-align:left;}                            /* 양쪽 맞춤은 좁은 폭에서 낱말 사이가 벌어진다 */
+  body .card{padding:18px 16px;}
+}
+/* 아주 좁은 폰(≤350px): 둘째 줄(과목 탭 · 아이디 · 로그아웃)이 한 줄에 들어가게 조금씩 줄인다.
+   전에는 로그아웃만 셋째 줄로 떨어졌다. */
+@media(max-width:350px){
+  body .subject-tab{padding-left:9px;padding-right:9px;}
+  body .hdr-user > .uid-badge{max-width:26vw;padding-left:8px;padding-right:8px;}
+  body .logout-btn{padding-left:6px;padding-right:6px;}
+}
+/* 안내문은 낱말 중간에서 꺾지 않는다('검토와 답안 표 / 기에'). 띄어쓰기에서만 줄을 바꾼다. */
+.card,.hub-notice,.done-card{word-break:keep-all;overflow-wrap:break-word;}
+.cnt-badge{white-space:nowrap;}
+.retry-btn{white-space:nowrap;}
 .uid-badge{font-size:12px;color:var(--tx2);background:var(--sf2);border:1px solid var(--bd);border-radius:14px;padding:4px 12px;}
 /* 과목 전환 — 세 과목을 펼쳐 두고 지금 과목을 채워서 표시한다.
    헤더가 어두운 배경이라 밝은 글자·테두리를 쓴다. */
@@ -1736,7 +1770,7 @@ function App() {
               <>
                 <div className="card">
                   <div className="card-title">📖 회독 선택</div>
-                  <div className="pill-row">
+                  <div className="pill-row rounds">
                     {ROUNDS.map(r=>(
                       <button key={r} className={`pill ${cfgRound===r?"act":""}`} onClick={()=>setCfgRound(r)}>
                         {r}회독
@@ -1754,7 +1788,7 @@ function App() {
                       실전 평균 <span className="cnt-badge">OX {T_AVG_OX}초</span>
                     </button>
                     <button className={`pill ${timerLevel==="max"?"act":""}`} onClick={()=>setTimerLevel("max")}>
-                      어려운 문제 상한 <span className="cnt-badge">OX {T_MAX_OX}초</span>
+                      최대 허용 <span className="cnt-badge">OX {T_MAX_OX}초</span>
                     </button>
                   </div>
                   <div style={{fontSize:11,color:"var(--tx3)",marginTop:8,lineHeight:1.7}}>
@@ -2110,7 +2144,7 @@ function App() {
                         return (
                           <div key={q.id} className={`arch-item ${archExp[k]?"exp":""} ${isMk&&!isW?"mk-item":""}`}
                             onClick={()=>setArchExp(p=>({...p,[k]:!p[k]}))}>
-                            <div className="arch-q">No.{q.id} {q.question}</div>
+                            <div className="arch-q" style={{whiteSpace:"pre-line"}}>No.{q.id} {String(q.question||"").split("§").map(x => x.trim()).join(String.fromCharCode(10))}</div>
                             {q.star && <span className="star-badge">⭐ 중요</span>}
                             <div className="arch-ans">정답: {q.answer?"○ 옳은 지문":"× 틀린 지문"}</div>
                             <span className="arch-tag">{TOPIC_ICONS[q.topic]||"📌"} {getMod()?.topics.find(t=>t.key===q.topic)?.label||q.topic}</span>
