@@ -264,6 +264,9 @@ MODULE_BUILDERS["형법각론"] = rows => (형법각론_DATA = rows.map(([id,q,a
 let 형사소송법_DATA = [];
 MODULE_BUILDERS["형사소송법"] = rows => (형사소송법_DATA = rows.map(([id,q,a,e,t])=>normalizeItem({id,question:q,answer:a,explanation:e,topic:t,star:STAR_IDS_형사소송법.has(String(id))}, EXAM_YEAR_형사소송법)));
 
+let 형사모의26_DATA = [];
+MODULE_BUILDERS["형사모의26"] = rows => (형사모의26_DATA = rows.map(([id,q,a,e,t,ch,u])=>({id,question:q,answer:a,explanation:e,topic:t,unit:u,star:false,choices:ch,examSource:null})));
+
 const MODULE_REGISTRY = [
   { id:"형법총론", label:"형법총론", subtitle:"형법 총칙편", icon:"⚖",
     count: 879, status:"active", color:"#c85878",
@@ -312,6 +315,18 @@ const MODULE_REGISTRY = [
       {key:"재판상소",label:"재판·상소"},
       {key:"비상구제특별절차",label:"비상구제·특별절차"},
     ], getData: () => 형사소송법_DATA },
+  /* 법전협 모의 원본 문제지 그대로의 5지선다. 문항 = [id, 문제(제문§보기), 정답, 해설, 회차·과목, 선지, 과목].
+     해설집이 없는 회차라 해설 글은 없고 선지·보기마다 정오만 붙어 있다(정답표 하나에서 다 나온다). */
+  { id:"형사모의26", label:"26년 모의 5지선다", subtitle:"법전협 6·8·10월 모의 · 형법·형사소송법", icon:"📝",
+    count: 120, status:"active", color:"#8a5a9c",
+    topics:[
+      {key:"26-1 형법", label:"26년 6월 모의 · 형법"},
+      {key:"26-1 형사소송법", label:"26년 6월 모의 · 형사소송법"},
+      {key:"26-2 형법", label:"26년 8월 모의 · 형법"},
+      {key:"26-2 형사소송법", label:"26년 8월 모의 · 형사소송법"},
+      {key:"26-3 형법", label:"26년 10월 모의 · 형법"},
+      {key:"26-3 형사소송법", label:"26년 10월 모의 · 형사소송법"}
+    ], getData: () => 형사모의26_DATA },
 ];
 
 // ── 스토리지 키 ──────────────────────────────────────
@@ -711,6 +726,35 @@ html.light .subject-tab.on{color:#fff;}
 .rv-toggle{font-size:12px;color:var(--blue);cursor:pointer;margin-top:5px;display:inline-block;text-decoration:underline;text-underline-offset:2px;}
 .mark-btn{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:6px 12px;border-radius:20px;border:1px solid rgba(188,140,255,.4);background:transparent;color:var(--purple);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
 .mark-btn:hover,.mark-btn.marked{background:rgba(188,140,255,.15);border-color:var(--purple);}
+/* 5지선다 — 선지가 길어 세로로 쌓는다. 번호는 고정폭으로 왼쪽에 둔다. */
+.mc-row{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.mc-item{display:flex;flex-direction:column;}
+.mc-btn{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--bd);background:var(--sf2);color:var(--tx);font-size:14px;line-height:1.65;cursor:pointer;transition:all .15s cubic-bezier(.2,.8,.2,1);font-family:'Noto Sans KR',sans-serif;}
+.mc-btn:not(:disabled):hover{border-color:var(--blue);transform:translateY(-1px);}
+.mc-btn:disabled{cursor:default;}
+.mc-no{flex:0 0 auto;font-weight:700;color:var(--tx3);}
+.mc-tx{flex:1;}
+.mc-btn.sel{border-color:var(--blue);background:var(--sf);}
+.mc-btn.ans{border-color:var(--ok);background:var(--ok-bg);}
+.mc-btn.ans .mc-no{color:var(--ok);}
+.mc-btn.bad{border-color:var(--er);background:var(--er-bg);}
+.mc-btn.bad .mc-no{color:var(--er);}
+/* 선지·보기 옆의 정오 표시(해설이 있으면 그 밑에 해설 상자). 왼쪽 띠 색이 그 지문의 정오다. */
+.mc-btn.has-exp{border-bottom-left-radius:4px;border-bottom-right-radius:4px;}
+.ch-exp{display:flex;gap:10px;align-items:flex-start;margin:0 0 6px 12px;padding:10px 14px;border:1px solid var(--bd);border-top:none;border-left:3px solid var(--tx3);border-radius:0 0 10px 10px;background:var(--sf);font-size:14px;line-height:1.7;color:var(--tx2);text-align:left;}
+.ch-exp.o{border-left-color:var(--ok);}
+.ch-exp.x{border-left-color:var(--er);}
+.ch-exp.bare{padding:5px 14px;font-size:12.5px;color:var(--tx3);}
+.ch-exp-tag{flex:0 0 auto;font-size:15px;font-weight:800;line-height:1.55;}
+.ch-exp.bare .ch-exp-tag{font-size:13px;}
+.ch-exp.o .ch-exp-tag{color:var(--ok);}
+.ch-exp.x .ch-exp-tag{color:var(--er);}
+.ch-exp-main{flex:1;min-width:0;word-break:keep-all;}
+.bogi-item{margin-bottom:8px;}
+.bogi-tx{white-space:pre-line;}
+.bogi-item .ch-exp{margin:6px 0 10px 0;border-top:1px solid var(--bd);border-radius:8px;}
+.rv-hint{font-size:11.5px;color:var(--tx3);margin-top:4px;}
+@media(max-width:700px){ .ch-exp{margin-left:6px;padding:8px 10px;gap:8px;font-size:13.5px;line-height:1.65;} .ch-exp.bare{padding:4px 10px;font-size:12px;} }
 .ox-row{display:flex;gap:10px;margin-top:16px;}
 .ox{flex:1;padding:16px;border-radius:14px;border:2px solid transparent;font-size:28px;font-weight:700;cursor:pointer;transition:all .15s cubic-bezier(.2,.8,.2,1);background:var(--sf2);}
 .ox.o{border-color:rgba(63,185,80,.3);color:var(--ok);}
@@ -811,6 +855,28 @@ html.light .subject-tab.on{color:#fff;}
 const TOPIC_ICONS = {}
 
 // ── 메인 앱 ───────────────────────────────────────────
+/* 5지선다 해설을 선지·보기별로 가른다. 조각은 '▸' 로 나뉘고 선지 조각은 '① (X) …', 보기 조각은 'ㄱ (O) …' 로 시작한다.
+   → byLabel: { '①': { ox: 'X', text } }, rest: 라벨 없는 조각(출처·문항 단위 해설)을 다시 이은 것.
+   해설 글이 없는 문항은 text 가 빈 채로 온다 — 그때는 정오 표시만 보여 준다. */
+function splitExp(exp) {
+  const byLabel = {}, rest = [];
+  for (const seg of String(exp || '').split(/\n?▸\s*/).filter(x => x.trim())) {
+    const m = seg.match(/^([①-⑤ㄱ-ㅎ])\s*\((O|X)\)\s*([\s\S]*)$/);
+    if (m && !byLabel[m[1]]) byLabel[m[1]] = { ox: m[2], text: m[3].trim() };
+    else rest.push(seg.trim());
+  }
+  return { byLabel, rest: rest.map(x => '▸ ' + x).join('\n'), hasText: Object.values(byLabel).some(e => e.text) };
+}
+
+// 5지선다 해설 칸 아래의 안내 — 해설 글이 있는 문항과 정오만 있는 문항을 가른다
+const mcHint = q => {
+  const where = q.question.includes('§') ? '보기' : '선지';
+  const s = splitExp(q.explanation);
+  if (s.hasText) return `해설은 ${where}마다 바로 아래에 있습니다.`;
+  return Object.keys(s.byLabel).length ? `이 문항은 해설이 아직 없습니다. ${where}마다 정오만 표시합니다.`
+                                       : '이 문항은 해설이 아직 없습니다.';
+};
+
 /* ── 시간 제한 ────────────────────────────────────────────────
    변호사시험 형사법 선택형은 40문항 70분이다. 검토·답안 표기에 5분을 떼고 문항 수로 나눈 것이
    한 문항의 **평균**(T_AVG_Q), 그 1.5배가 **어려운 문제에 쓸 수 있는 상한**(T_MAX_Q)이다.
@@ -1203,7 +1269,7 @@ function App() {
     if (answered !== null) return;
     const cur = queue[qidx];
     const correct = choice === cur.answer;
-    setUserAns(choice); setAnswered(correct ? "ok" : "er"); setShowExp(false);
+    setUserAns(choice); setAnswered(correct ? "ok" : "er"); setShowExp(!!cur.choices);   // 5지선다는 정오를 바로 편다
     const r = cfgRound;
     const np = {
       answered: new Set([...(progMap[r]?.answered||[]), cur.id]),
@@ -1289,7 +1355,7 @@ function App() {
     const cur = queue[qidx];
     if (!cur) return;
     // 오답 강제 처리
-    setAnswered("er"); setUserAns(null); setShowExp(false);
+    setAnswered("er"); setUserAns(null); setShowExp(!!cur.choices);
     setSessErr(p => p + 1);
     const r = cfgRound;
     const np = {
@@ -1569,6 +1635,16 @@ function App() {
     }));
   }
 
+  // 선지(보기) 하나의 정오 표시. 해설 글이 있으면 같이 보여 준다.
+  function chExp(lab, e) {
+    return (
+      <div className={`ch-exp ${e.ox === 'O' ? 'o' : 'x'}${e.text ? '' : ' bare'}`}>
+        <span className="ch-exp-tag">{e.ox === 'O' ? '○' : '×'}</span>
+        <div className="ch-exp-main">{e.text ? renderExp(e.text) : (e.ox === 'O' ? '옳은 지문입니다.' : '옳지 않은 지문입니다.')}</div>
+      </div>
+    );
+  }
+
   function renderExp(exp) {
     if (!exp) return null;
     const boxStyle = {
@@ -1759,7 +1835,7 @@ function App() {
                       전체 <span className="cnt-badge">{TOTAL}문제</span>
                     </button>
                     <button className={`pill blue ${cfgMode==="rnd100"?"act":""}`} onClick={()=>{setCfgMode("rnd100");setCfgTopics([]);}}>
-                      무작위 100문제 <span style={{fontSize:10,background:"rgba(248,113,113,.18)",color:"#f87171",borderRadius:5,padding:"1px 5px",marginLeft:3,fontWeight:700,letterSpacing:".02em"}}>⏱ {timeFor(null, tLevel).limit}s</span>
+                      무작위 100문제 <span style={{fontSize:10,background:"rgba(248,113,113,.18)",color:"#f87171",borderRadius:5,padding:"1px 5px",marginLeft:3,fontWeight:700,letterSpacing:".02em"}}>⏱ {fmtSec(timeFor((getAll()||[])[0], tLevel).limit)}</span>
                     </button>
                     <button className={`pill ${cfgMode==="topic"?"act":""}`} onClick={()=>setCfgMode("topic")}>
                       주제 선택
@@ -1897,32 +1973,57 @@ function App() {
                   })()}
                   {(() => {
                   function stripPrefix(s) {
+                    // ⚠ 5지선다 합답형은 뒤쪽이 'ㄱ. …' 보기 묶음이다. 여기서 'ㄱ.' 을 떼면 선지(① ㄱ, ㄴ)와 짝이 안 맞는다.
+                    if (cur.choices) return (s||'').trim();
                     return (s||'').replace(/^[ㄱ-ㅎ①-⑳⑴-⑽]\.?\s*/, '').trim();
                   }
+                  const qStyle = cur.choices ? {whiteSpace:"pre-line"} : undefined;
                   const parts = (cur.question || '').split('§');
                   if (parts.length >= 2) {
                     return (
                       <div>
                         <div className="fact-box">
-                          <div className="fact-label">🗂 사실관계</div>
+                          <div className="fact-label">{cur.choices ? "🗂 문제" : "🗂 사실관계"}</div>
                           {fmtLong(parts[0].trim(), 'fact')}
                         </div>
-                        <div className="question">{stripPrefix(parts[1])}</div>
+                        {cur.choices ? (() => {
+                          // 합답형 — 보기(ㄱㄴㄷ)를 한 줄씩 가르고, 답한 뒤에는 보기마다 바로 밑에 정오(·해설)를 단다
+                          const ex = answered !== null && showExp ? splitExp(cur.explanation).byLabel : {};
+                          return (
+                            <div className="question bogi-list">
+                              {parts[1].trim().split(/\n(?=[ㄱ-ㅎ]\.\s)/).map((line, i) => {
+                                const lab = (line.match(/^([ㄱ-ㅎ])\./) || [])[1];
+                                return (
+                                  <div key={i} className="bogi-item">
+                                    <div className="bogi-tx">{line}</div>
+                                    {lab && ex[lab] && chExp(lab, ex[lab])}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })() : <div className="question">{stripPrefix(parts[1])}</div>}
                       </div>
                     );
                   }
-                  return <div className="question">{stripPrefix(cur.question)}</div>;
+                  return <div className="question" style={qStyle}>{stripPrefix(cur.question)}</div>;
                 })()}
                   {answered !== null && (
                     <div className={`reveal ${answered}`}>
                       <div className="rv-label">
                         {answered==="ok"?"⭕":"❌"}
                         <span className="rv-verdict">
-                          {answered==="ok" ? `정답 (${cur.answer?"○ 옳은 지문":"× 틀린 지문"})` : `${userAns === null ? "시간 초과" : "오답"}. 정답: ${cur.answer?"○ 옳은 지문":"× 틀린 지문"}`}
+                          {(() => {
+                            // 5지선다는 정답이 원문자, OX 는 참·거짓이라 표시가 다르다
+                            const a = cur.choices ? `${cur.answer}번` : (cur.answer ? "○ 옳은 지문" : "× 틀린 지문");
+                            return answered==="ok" ? `정답 (${a})` : `${userAns === null ? "시간 초과" : "오답"}. 정답: ${a}`;
+                          })()}
                         </span>
                       </div>
                       {showExp
-                        ? <><div className="rv-exp">{renderExp(cur.explanation)}</div><span className="rv-toggle" onClick={()=>setShowExp(false)}>▴ 접기</span></>
+                        ? <><div className="rv-exp">{renderExp(cur.choices ? splitExp(cur.explanation).rest : cur.explanation)}
+                              {cur.choices && <div className="rv-hint">{mcHint(cur)}</div>}
+                            </div><span className="rv-toggle" onClick={()=>setShowExp(false)}>▴ 접기</span></>
                         : <span className="rv-toggle" onClick={()=>setShowExp(true)}>▸ 해설 보기</span>
                       }
                       <div style={{marginTop:10}}>
@@ -1994,10 +2095,34 @@ function App() {
 
 
                 })()}
+                {cur.choices ? (
+                  /* 5지선다 — 선지를 그대로 보여 준다. 답한 뒤에는 선지마다 바로 밑에 정오(·해설)를 단다. */
+                  <div className="mc-row">
+                    {(() => {
+                      const ex = answered !== null && showExp ? splitExp(cur.explanation).byLabel : {};
+                      return cur.choices.map(([ch, txt]) => {
+                        const sel = userAns === ch;
+                        const isAns = answered !== null && cur.answer === ch;
+                        return (
+                          <div key={ch} className="mc-item">
+                            <button
+                              className={`mc-btn${sel?" sel":""}${isAns?" ans":""}${sel&&!isAns&&answered!==null?" bad":""}${ex[ch]?" has-exp":""}`}
+                              onClick={()=>handleAnswer(ch)} disabled={answered!==null}>
+                              <span className="mc-no">{ch}</span>
+                              <span className="mc-tx">{txt}</span>
+                            </button>
+                            {ex[ch] && chExp(ch, ex[ch])}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
                 <div className="ox-row">
                   <button className={`ox o ${userAns===true?"sel-o":""}`}  onClick={()=>handleAnswer(true)}  disabled={answered!==null}>○</button>
                   <button className={`ox x ${userAns===false?"sel-x":""}`} onClick={()=>handleAnswer(false)} disabled={answered!==null}>✕</button>
                 </div>
+                )}
                 {answered !== null && (
                   <button className="next-btn" onClick={handleNext}>{qidx+1<queue.length?"다음 문제 →":"결과 보기"}</button>
                 )}
@@ -2099,7 +2224,7 @@ function App() {
                             <div className="arch-q" style={{whiteSpace:"pre-line"}}>No.{q.id} {String(q.question||"").split("§").map(x => x.trim()).join(String.fromCharCode(10))}</div>
                             {q.star && <span className="star-badge">⭐ 중요</span>}
                             {q.starWhite && <span className="star-badge-white">☆ 참고</span>}
-                            <div className="arch-ans">정답: {q.answer?"○ 옳은 지문":"× 틀린 지문"}</div>
+                            <div className="arch-ans">정답: {q.choices ? `${q.answer}번` : (q.answer?"○ 옳은 지문":"× 틀린 지문")}</div>
                             <span className="arch-tag">{TOPIC_ICONS[q.topic]||"📌"} {getMod()?.topics.find(t=>t.key===q.topic)?.label||q.topic}</span>
                             {isW&&<span className="arch-tag">오답</span>}
                             {isMk&&<span className="arch-tag mk">🔖 헷갈림</span>}

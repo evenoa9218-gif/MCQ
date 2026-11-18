@@ -1105,7 +1105,7 @@ MODULE_LOADERS["상법"] = () => Promise.all([받기('상법.json'), 가져오�
     star: false
   }));
 });
-MODULE_LOADERS["상법기말"] = () => Promise.all([받기('상법5지.json', 4), 받기('상법기말OX.json', 4), 가져오기('상법회차.json', [])]).then(([five, fin, rounds]) => {
+MODULE_LOADERS["상법기말"] = () => Promise.all([받기('상법5지.json', 5), 받기('상법기말OX.json', 5), 가져오기('상법회차.json', [])]).then(([five, fin, rounds]) => {
   상법_회차 = rounds;
   // 5지선다: [id, 문제, 정답, 해설, 회차, 선지, 단원] / OX: [id, 지문, 정오, 해설, 회차, 단원]
   상법5지_RAW = five.map(([id, q, a, e, t, ch, u]) => normalizeStar({
@@ -1132,6 +1132,17 @@ MODULE_LOADERS["상법기말"] = () => Promise.all([받기('상법5지.json', 4)
   for (const k in FIN_CACHE) delete FIN_CACHE[k];
   return FIN_DATA();
 });
+let 민사모의26_DATA = [];
+MODULE_BUILDERS["민사모의26"] = rows => 민사모의26_DATA = rows.map(([id, q, a, e, t, ch, u]) => ({
+  id,
+  question: q,
+  answer: a,
+  explanation: e,
+  topic: t,
+  unit: u,
+  star: false,
+  choices: ch
+}));
 
 // ── 모듈 레지스트리 ──────────────────────────────────
 // 새 퀴즈 추가 시 여기에 등록
@@ -1535,12 +1546,37 @@ const MODULE_REGISTRY = [{
     return FIN_MODE === 'mc' ? '5지선다 · 변시 1~15회 + 모의 24~26' : 'OX · 기말범위 지문 그대로';
   },
   get count() {
-    return FIN_DATA().length || (FIN_MODE === 'mc' ? 451 : 2188);
+    return FIN_DATA().length || (FIN_MODE === 'mc' ? 469 : 2276);
   },
   get topics() {
     return FIN_TOPICS();
   },
   getData: () => FIN_DATA()
+},
+/* 법전협 모의 원본 문제지 그대로의 5지선다. 문항 = [id, 문제(제문§보기), 정답, 해설, 회차·과목, 선지, 과목].
+   해설집이 없는 회차라 해설 글은 없고 선지·보기마다 정오만 붙어 있다(정답표 하나에서 다 나온다). */
+{
+  id: "민사모의26",
+  label: "26년 모의 5지선다",
+  subtitle: "법전협 6·10월 모의 · 민법·민사소송법 (상법은 「상법 기말대비」)",
+  icon: "📝",
+  count: 103,
+  status: "active",
+  color: "#6a5a9c",
+  topics: [{
+    key: "26-1 민법",
+    label: "26년 6월 모의 · 민법"
+  }, {
+    key: "26-1 민사소송법",
+    label: "26년 6월 모의 · 민사소송법"
+  }, {
+    key: "26-3 민법",
+    label: "26년 10월 모의 · 민법"
+  }, {
+    key: "26-3 민사소송법",
+    label: "26년 10월 모의 · 민사소송법"
+  }],
+  getData: () => 민사모의26_DATA
 }];
 
 // ── 스토리지 키 ──────────────────────────────────────
@@ -1552,7 +1588,7 @@ const ADMIN_ID = "Sol";
    회차별 모아풀기는 민법·민소를 한꺼번에 푸는 것이라 어느 과목에도 넣지 않고 따로 둔다.
    여기 안 적힌 모듈이 생기면 맨 끝 '기타' 줄에 모아 보여 준다 — 화면에서 조용히 사라지지 않게. */
 const HUB_GROUPS = (() => {
-  const plan = [["민법", ["채권총론", "채권각론", "민법총칙", "물권법"]], ["민사소송법", ["민사소송법"]], ["상법", ["상법", "상법기말"]], ["모아풀기", ["회차모아"]]];
+  const plan = [["민법", ["채권총론", "채권각론", "민법총칙", "물권법"]], ["민사소송법", ["민사소송법"]], ["상법", ["상법", "상법기말"]], ["모아풀기", ["회차모아", "민사모의26"]]];
   const used = new Set(plan.flatMap(([, ids]) => ids));
   const byId = id => MODULE_REGISTRY.find(m => m.id === id);
   const groups = plan.map(([label, ids]) => ({
@@ -2515,9 +2551,18 @@ function splitExp(exp) {
   }
   return {
     byLabel,
-    rest: rest.map(x => '▸ ' + x).join('\n')
+    rest: rest.map(x => '▸ ' + x).join('\n'),
+    hasText: Object.values(byLabel).some(e => e.text)
   };
 }
+
+// 5지선다 해설 칸 아래의 안내 — 해설 글이 있는 문항과 정오만 있는 문항을 가른다
+const mcHint = q => {
+  const where = q.question.includes('§') ? '보기' : '선지';
+  const s = splitExp(q.explanation);
+  if (s.hasText) return `해설은 ${where}마다 바로 아래에 있습니다.`;
+  return Object.keys(s.byLabel).length ? `이 문항은 해설이 아직 없습니다. ${where}마다 정오만 표시합니다.` : '이 문항은 해설이 아직 없습니다.';
+};
 
 /* ── 시간 제한 ────────────────────────────────────────────────
    변호사시험 민사법 선택형은 70문항 120분이다. 검토·답안 표기에 10분을 떼고 문항 수로 나눈 것이
@@ -3855,7 +3900,7 @@ function App() {
       className: "ch-exp-main"
     }, /*#__PURE__*/React.createElement("div", {
       className: `ch-exp-body${long && !open ? ' clamp' : ''}`
-    }, renderExp(e.text)), long && /*#__PURE__*/React.createElement("span", {
+    }, e.text ? renderExp(e.text) : e.ox === 'O' ? '옳은 지문입니다.' : '옳지 않은 지문입니다.'), long && /*#__PURE__*/React.createElement("span", {
       className: "ch-exp-more",
       onClick: () => setChOpen(o => ({
         ...o,
@@ -4510,7 +4555,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: ".02em"
     }
-  }, "⏱ ", timeFor(null, tLevel).limit, "s")), /*#__PURE__*/React.createElement("button", {
+  }, "⏱ ", fmtSec(timeFor((getAll() || [])[0], tLevel).limit))), /*#__PURE__*/React.createElement("button", {
     className: `pill ${cfgMode === "topic" ? "act" : ""}`,
     onClick: () => setCfgMode("topic")
   }, activeModule === "회차모아" || activeModule === "상법기말" && finAxis === "round" ? "회차 선택" : activeModule === "상법기말" ? "단원 선택" : "주제 선택"), /*#__PURE__*/React.createElement("button", {
@@ -4800,7 +4845,7 @@ function App() {
     className: "rv-exp"
   }, renderExp(cur.choices ? splitExp(cur.explanation).rest : cur.explanation), cur.choices && /*#__PURE__*/React.createElement("div", {
     className: "rv-hint"
-  }, "해설은 ", cur.question.includes('§') ? '보기' : '선지', "마다 바로 아래에 있습니다.")), /*#__PURE__*/React.createElement("span", {
+  }, mcHint(cur))), /*#__PURE__*/React.createElement("span", {
     className: "rv-toggle",
     onClick: () => setShowExp(false)
   }, "▴ 해설 접기")) : /*#__PURE__*/React.createElement("span", {
@@ -5135,7 +5180,7 @@ function App() {
         className: "star-badge"
       }, "⭐ 중요"), /*#__PURE__*/React.createElement("div", {
         className: "arch-ans"
-      }, "정답: ", q.answer ? "○ 옳은 지문" : "× 틀린 지문"), /*#__PURE__*/React.createElement("span", {
+      }, "정답: ", q.choices ? `${q.answer}번` : q.answer ? "○ 옳은 지문" : "× 틀린 지문"), /*#__PURE__*/React.createElement("span", {
         className: "arch-tag"
       }, TOPIC_ICONS[q.topic] || "📌", " ", getMod()?.topics.find(t => t.key === q.topic)?.label || q.topic), isW && /*#__PURE__*/React.createElement("span", {
         className: "arch-tag"

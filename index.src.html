@@ -891,7 +891,7 @@ MODULE_LOADERS["상법"] = () =>
   });
 
 MODULE_LOADERS["상법기말"] = () =>
-  Promise.all([받기('상법5지.json', 4), 받기('상법기말OX.json', 4), 가져오기('상법회차.json', [])])
+  Promise.all([받기('상법5지.json', 5), 받기('상법기말OX.json', 5), 가져오기('상법회차.json', [])])
     .then(([five, fin, rounds]) => {
       상법_회차 = rounds;
       // 5지선다: [id, 문제, 정답, 해설, 회차, 선지, 단원] / OX: [id, 지문, 정오, 해설, 회차, 단원]
@@ -902,6 +902,9 @@ MODULE_LOADERS["상법기말"] = () =>
       for (const k in FIN_CACHE) delete FIN_CACHE[k];
       return FIN_DATA();
     });
+
+let 민사모의26_DATA = [];
+MODULE_BUILDERS["민사모의26"] = rows => (민사모의26_DATA = rows.map(([id,q,a,e,t,ch,u])=>({id,question:q,answer:a,explanation:e,topic:t,unit:u,star:false,choices:ch})));
 
 // ── 모듈 레지스트리 ──────────────────────────────────
 // 새 퀴즈 추가 시 여기에 등록
@@ -1077,10 +1080,20 @@ const MODULE_REGISTRY = [
     // 푸는 방식·나누는 축에 따라 문항수·주제가 바뀐다 → 게터로 둔다
     get subtitle(){ return FIN_MODE === 'mc' ? '5지선다 · 변시 1~15회 + 모의 24~26'
                                            : 'OX · 기말범위 지문 그대로'; },
-    get count(){ return FIN_DATA().length || (FIN_MODE === 'mc' ? 451 : 2188); },
+    get count(){ return FIN_DATA().length || (FIN_MODE === 'mc' ? 469 : 2276); },
     get topics(){ return FIN_TOPICS(); },
     getData: () => FIN_DATA(),
   },
+  /* 법전협 모의 원본 문제지 그대로의 5지선다. 문항 = [id, 문제(제문§보기), 정답, 해설, 회차·과목, 선지, 과목].
+     해설집이 없는 회차라 해설 글은 없고 선지·보기마다 정오만 붙어 있다(정답표 하나에서 다 나온다). */
+  { id:"민사모의26", label:"26년 모의 5지선다", subtitle:"법전협 6·10월 모의 · 민법·민사소송법 (상법은 「상법 기말대비」)", icon:"📝",
+    count: 103, status:"active", color:"#6a5a9c",
+    topics:[
+      {key:"26-1 민법", label:"26년 6월 모의 · 민법"},
+      {key:"26-1 민사소송법", label:"26년 6월 모의 · 민사소송법"},
+      {key:"26-3 민법", label:"26년 10월 모의 · 민법"},
+      {key:"26-3 민사소송법", label:"26년 10월 모의 · 민사소송법"}
+    ], getData: () => 민사모의26_DATA },
 ];
 
 // ── 스토리지 키 ──────────────────────────────────────
@@ -1096,7 +1109,7 @@ const HUB_GROUPS = (() => {
     ["민법",       ["채권총론", "채권각론", "민법총칙", "물권법"]],
     ["민사소송법", ["민사소송법"]],
     ["상법",       ["상법", "상법기말"]],
-    ["모아풀기",   ["회차모아"]],
+    ["모아풀기",   ["회차모아", "민사모의26"]],
   ];
   const used = new Set(plan.flatMap(([, ids]) => ids));
   const byId = id => MODULE_REGISTRY.find(m => m.id === id);
@@ -1831,8 +1844,17 @@ function splitExp(exp) {
     if (m && !byLabel[m[1]]) byLabel[m[1]] = { ox: m[2], text: m[3].trim() };
     else rest.push(seg.trim());
   }
-  return { byLabel, rest: rest.map(x => '▸ ' + x).join('\n') };
+  return { byLabel, rest: rest.map(x => '▸ ' + x).join('\n'), hasText: Object.values(byLabel).some(e => e.text) };
 }
+
+// 5지선다 해설 칸 아래의 안내 — 해설 글이 있는 문항과 정오만 있는 문항을 가른다
+const mcHint = q => {
+  const where = q.question.includes('§') ? '보기' : '선지';
+  const s = splitExp(q.explanation);
+  if (s.hasText) return `해설은 ${where}마다 바로 아래에 있습니다.`;
+  return Object.keys(s.byLabel).length ? `이 문항은 해설이 아직 없습니다. ${where}마다 정오만 표시합니다.`
+                                       : '이 문항은 해설이 아직 없습니다.';
+};
 
 /* ── 시간 제한 ────────────────────────────────────────────────
    변호사시험 민사법 선택형은 70문항 120분이다. 검토·답안 표기에 10분을 떼고 문항 수로 나눈 것이
@@ -2755,7 +2777,7 @@ function App() {
       <div className={`ch-exp ${e.ox === 'O' ? 'o' : 'x'}`}>
         <span className="ch-exp-tag">{e.ox === 'O' ? '○' : '×'}</span>
         <div className="ch-exp-main">
-          <div className={`ch-exp-body${long && !open ? ' clamp' : ''}`}>{renderExp(e.text)}</div>
+          <div className={`ch-exp-body${long && !open ? ' clamp' : ''}`}>{e.text ? renderExp(e.text) : (e.ox === 'O' ? '옳은 지문입니다.' : '옳지 않은 지문입니다.')}</div>
           {long && <span className="ch-exp-more" onClick={()=>setChOpen(o=>({...o,[k]:!open}))}>{open ? '접기 ▴' : '더 보기 ▾'}</span>}
         </div>
       </div>
@@ -3130,7 +3152,7 @@ function App() {
                       전체 <span className="cnt-badge">{TOTAL}문제</span>
                     </button>
                     <button className={`pill blue ${cfgMode==="rnd100"?"act":""}`} onClick={()=>{setCfgMode("rnd100");setCfgTopics([]);}}>
-                      무작위 100문제 <span style={{fontSize:10,background:"rgba(248,113,113,.18)",color:"#f87171",borderRadius:5,padding:"1px 5px",marginLeft:3,fontWeight:700,letterSpacing:".02em"}}>⏱ {timeFor(null, tLevel).limit}s</span>
+                      무작위 100문제 <span style={{fontSize:10,background:"rgba(248,113,113,.18)",color:"#f87171",borderRadius:5,padding:"1px 5px",marginLeft:3,fontWeight:700,letterSpacing:".02em"}}>⏱ {fmtSec(timeFor((getAll()||[])[0], tLevel).limit)}</span>
                     </button>
                     <button className={`pill ${cfgMode==="topic"?"act":""}`} onClick={()=>setCfgMode("topic")}>
                       {(activeModule==="회차모아" || (activeModule==="상법기말" && finAxis==="round")) ? "회차 선택" : activeModule==="상법기말" ? "단원 선택" : "주제 선택"}
@@ -3337,7 +3359,7 @@ function App() {
                       </div>
                       {showExp
                         ? <><div className="rv-exp">{renderExp(cur.choices ? splitExp(cur.explanation).rest : cur.explanation)}
-                              {cur.choices && <div className="rv-hint">해설은 {cur.question.includes('§') ? '보기' : '선지'}마다 바로 아래에 있습니다.</div>}
+                              {cur.choices && <div className="rv-hint">{mcHint(cur)}</div>}
                             </div><span className="rv-toggle" onClick={()=>setShowExp(false)}>▴ 해설 접기</span></>
                         : <span className="rv-toggle" onClick={()=>setShowExp(true)}>▸ 해설 보기</span>
                       }
@@ -3542,7 +3564,7 @@ function App() {
                             onClick={()=>setArchExp(p=>({...p,[k]:!p[k]}))}>
                             <div className="arch-q" style={{whiteSpace:"pre-line"}}>No.{q.id} {String(q.question||"").split("§").map(x => x.trim()).join(String.fromCharCode(10))}</div>
                             {q.star && <span className="star-badge">⭐ 중요</span>}
-                            <div className="arch-ans">정답: {q.answer?"○ 옳은 지문":"× 틀린 지문"}</div>
+                            <div className="arch-ans">정답: {q.choices ? `${q.answer}번` : (q.answer?"○ 옳은 지문":"× 틀린 지문")}</div>
                             <span className="arch-tag">{TOPIC_ICONS[q.topic]||"📌"} {getMod()?.topics.find(t=>t.key===q.topic)?.label||q.topic}</span>
                             {isW&&<span className="arch-tag">오답</span>}
                             {isMk&&<span className="arch-tag mk">🔖 헷갈림</span>}
