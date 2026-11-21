@@ -714,7 +714,7 @@ html.light .subject-tab.on{color:#fff;}
 .qcard-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .qcard-no{font-size:11px;color:var(--tx3);font-family:'IBM Plex Mono',monospace;}
 .qcard-topic{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--sf2);border:1px solid var(--bd2);color:var(--tx3);}
-.question{font-family:'Noto Serif KR',serif;font-size:16px;line-height:2.0;color:var(--tx);word-break:keep-all;}
+.question{font-family:'Noto Serif KR',serif;font-size:16px;line-height:2.0;color:var(--tx);word-break:keep-all;text-align:justify;}
 .reveal{margin-top:18px;padding:14px 16px;border-radius:8px;animation:fi .2s ease;}
 .reveal.ok{background:var(--ok-bg);border:1px solid rgba(63,185,80,.3);}
 .reveal.er{background:var(--er-bg);border:1px solid rgba(248,81,73,.3);}
@@ -733,7 +733,9 @@ html.light .subject-tab.on{color:#fff;}
 .mc-btn:not(:disabled):hover{border-color:var(--blue);transform:translateY(-1px);}
 .mc-btn:disabled{cursor:default;}
 .mc-no{flex:0 0 auto;font-weight:700;color:var(--tx3);}
-.mc-tx{flex:1;}
+.mc-tx{flex:1;min-width:0;text-align:justify;word-break:keep-all;}
+/* 폰 너비에서는 낱말 단위로 끊으면 양쪽 맞춤 줄의 낱말 사이가 크게 벌어진다 — 책처럼 글자 단위로 끊는다. */
+@media (max-width:560px){.question,.mc-tx,.ch-exp-main,.fact-box,.rv-exp{word-break:normal;overflow-wrap:break-word;}}
 .mc-btn.sel{border-color:var(--blue);background:var(--sf);}
 .mc-btn.ans{border-color:var(--ok);background:var(--ok-bg);}
 .mc-btn.ans .mc-no{color:var(--ok);}
@@ -741,7 +743,7 @@ html.light .subject-tab.on{color:#fff;}
 .mc-btn.bad .mc-no{color:var(--er);}
 /* 선지·보기 옆의 정오 표시(해설이 있으면 그 밑에 해설 상자). 왼쪽 띠 색이 그 지문의 정오다. */
 .mc-btn.has-exp{border-bottom-left-radius:4px;border-bottom-right-radius:4px;}
-.ch-exp{display:flex;gap:10px;align-items:flex-start;margin:0 0 6px 12px;padding:10px 14px;border:1px solid var(--bd);border-top:none;border-left:3px solid var(--tx3);border-radius:0 0 10px 10px;background:var(--sf);font-size:14px;line-height:1.7;color:var(--tx2);text-align:left;}
+.ch-exp{display:flex;gap:10px;align-items:flex-start;margin:0 0 6px 12px;padding:10px 14px;border:1px solid var(--bd);border-top:none;border-left:3px solid var(--tx3);border-radius:0 0 10px 10px;background:var(--sf);font-size:14px;line-height:1.7;color:var(--tx2);text-align:justify;}
 .ch-exp.o{border-left-color:var(--ok);}
 .ch-exp.x{border-left-color:var(--er);}
 .ch-exp.bare{padding:5px 14px;font-size:12.5px;color:var(--tx3);}
@@ -801,7 +803,7 @@ html.light .subject-tab.on{color:#fff;}
 .arch-item:hover{background:var(--sf2);}
 .arch-item.exp{border-left-color:var(--gold);}
 .arch-item.mk-item{border-left-color:var(--purple);}
-.arch-q{font-size:13px;line-height:1.6;color:var(--tx);font-family:'Noto Serif KR',serif;word-break:keep-all;}
+.arch-q{font-size:13px;line-height:1.6;color:var(--tx);font-family:'Noto Serif KR',serif;word-break:keep-all;text-align:justify;}
 .arch-ans{font-size:11px;color:var(--tx3);margin-top:5px;font-family:'IBM Plex Mono',monospace;}
 .arch-tag{font-size:10px;color:var(--tx3);background:var(--sf2);border:1px solid var(--bd2);border-radius:8px;padding:1px 6px;display:inline-block;margin-top:4px;margin-right:4px;}
 .arch-tag.mk{border-color:rgba(188,140,255,.3);color:var(--purple);background:rgba(188,140,255,.08);}
