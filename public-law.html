@@ -777,16 +777,37 @@ html.light .subject-tab.on{color:#fff;}
 .mc-row{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
 .mc-item{display:flex;flex-direction:column;}
 /* 선지·보기별 헷갈림 단추. 옆에 칸을 따로 두면 지문 줄이 짧아져 읽기 나빠진다 →
-   선지는 번호(①) 바로 밑 빈자리에 얹고, 보기(ㄱㄴㄷ)는 글 끝에 이어 붙인다. 폭을 더 쓰지 않는다. */
+   선지는 번호(①) 바로 밑 빈자리에 얹고, 보기(ㄱㄴㄷ)는 글 끝에 이어 붙인다. 폭을 더 쓰지 않는다.
+   모양은 선으로 그린 책갈피 — 평소엔 옅은 선, 표시하면 보라색으로 채움, 이전 회독 표시는 보라색 선. */
 .mc-line{position:relative;}
-.mc-line .mc-btn{min-height:68px;}
-.ch-mark{position:absolute;left:6px;top:38px;z-index:1;width:32px;height:26px;display:flex;align-items:center;justify-content:center;padding:0;border:1.5px solid transparent;border-radius:8px;background:transparent;font-size:13px;line-height:1;cursor:pointer;opacity:.4;filter:grayscale(1);transition:all .15s;font-family:inherit;}
-.ch-mark:hover{opacity:.85;filter:none;}
-.ch-mark.prev{opacity:.8;filter:none;border-style:dashed;border-color:var(--purple);}
-.ch-mark.on{opacity:1;filter:none;border-color:var(--purple);background:rgba(188,140,255,.18);}
-.ch-mark.inl{position:static;display:inline-flex;vertical-align:middle;width:28px;height:22px;margin-left:4px;font-size:12px;}
-.mc-item.chm .mc-btn{box-shadow:inset 4px 0 0 var(--purple);}
-.bogi-item.chm .bogi-tx{box-shadow:-4px 0 0 var(--purple);padding-left:8px;margin-left:4px;}
+.mc-line.has-mark .mc-btn{min-height:62px;}
+.ch-mark{position:absolute;left:7px;top:35px;z-index:1;width:30px;height:24px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:6px;background:transparent;color:var(--tx3);opacity:.5;cursor:pointer;transition:color .15s,opacity .15s;-webkit-tap-highlight-color:transparent;}
+.ch-mark svg{display:block;}
+.ch-mark:hover{opacity:.9;}
+.ch-mark.prev{color:var(--purple);opacity:.75;}
+.ch-mark.on{color:var(--purple);opacity:1;}
+.ch-mark.inl{position:static;display:inline-flex;vertical-align:-3px;width:24px;height:18px;margin-left:2px;}
+.mc-item.chm .mc-btn{box-shadow:inset 3px 0 0 var(--purple);}
+.bogi-item.chm .bogi-tx{box-shadow:-3px 0 0 var(--purple);padding-left:8px;margin-left:3px;}
+/* 폰: 문제와 선지 다섯 개가 한 화면에 최대한 들어오게 문제 화면만 촘촘히 한다(글자 크기는 그대로). */
+@media(max-width:700px){
+  /* 머리(제목·과목 탭)는 문제를 푸는 동안 화면에 붙어 따라오지 않게 한다 — 폰에서 120px 남짓을 늘 차지했다. 위로 올리면 다시 보인다. */
+  html.quizzing .hdr{position:static;}
+  html.quizzing .timer-row{top:6px;}
+  html.quizzing .main{padding:10px 10px 80px;}
+  body .back-btn{margin-bottom:8px;}
+  body .prog-wrap{margin-bottom:10px;}
+  body .qcard{padding:11px 12px;margin-bottom:8px;border-radius:14px;}
+  body .qcard .question{font-size:14.5px;line-height:1.62;}
+  body .qcard .fact-box{padding:9px 11px;margin-bottom:8px;line-height:1.62;}
+  body .bogi-item{margin-bottom:5px;}
+  body .mc-row{gap:5px;margin-top:8px;}
+  body .mc-btn{padding:8px 10px 8px 9px;gap:7px;line-height:1.5;border-radius:10px;letter-spacing:-.15px;}
+  body .mc-line.has-mark .mc-btn{min-height:54px;}
+  body .ch-mark{left:2px;top:28px;}
+  body .ch-mark.inl{position:static;}
+  body .next-btn{margin-top:8px;}
+}
 .arch-chm{margin-top:8px;padding:8px 10px;border-left:3px solid var(--purple);background:rgba(188,140,255,.07);border-radius:0 8px 8px 0;font-size:12.5px;line-height:1.65;color:var(--tx2);text-align:left;}
 .arch-chm-h{font-size:11px;font-weight:700;color:var(--purple);margin-bottom:4px;}
 .arch-chm-row{margin-top:4px;}
@@ -1034,6 +1055,17 @@ function App() {
   const [hubStats,  setHubStats]  = useState({});  // {modId: {wc, mc, pct}}
   const [wrongMap,  setWrongMap]  = useState({});
   const [markedMap, setMarkedMap] = useState({});
+  // 폰: 문제가 바뀌면 문제 카드를 화면 맨 위로 올린다 — 머리·탭·진도 줄을 지나쳐 문제와 선지가 한 화면에 최대한 들어오게.
+  useEffect(() => {
+    if (window.innerWidth > 700 || !queue.length) return;
+    const t = setTimeout(() => {
+      const q = document.querySelector('.qcard');
+      if (q) window.scrollTo(0, Math.max(0, q.getBoundingClientRect().top + window.scrollY - 6));
+    }, 80);
+    return () => clearTimeout(t);
+  }, [qidx, queue]);
+  // 문제를 푸는 화면인지 html 에 표시해 둔다(폰 전용 CSS 가 이걸 본다). :has() 는 구형 브라우저에서 안 먹어 직접 단다.
+  useEffect(() => { document.documentElement.classList.toggle('quizzing', !!document.querySelector('.qcard')); });
   const [chMarkMap, setChMarkMap] = useState({});   // 5지선다 선지별 헷갈림 — { 회독: Set('문항id|라벨') }
   const [progMap,   setProgMap]   = useState({});
 
@@ -1742,10 +1774,12 @@ function App() {
     const tip = on ? '헷갈림 표시를 해제합니다' : prev ? '이전 회독에서 헷갈림으로 표시한 지문입니다. 누르면 이번 회독에도 표시합니다' : '이 지문을 헷갈림으로 표시합니다';
     return (
       <button type="button" className={`ch-mark${inl?' inl':''}${on?' on':''}${prev?' prev':''}`} title={tip} aria-label={tip} aria-pressed={on}
-        onClick={e=>{e.stopPropagation();toggleChMark(lab);}}>🔖</button>
+        onClick={e=>{e.stopPropagation();toggleChMark(lab);}}><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 3.5h10a1 1 0 0 1 1 1V21l-6-4.3L6 21V4.5a1 1 0 0 1 1-1z" fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg></button>
     );
   }
   const chMarked = lab => (chMarkMap[cfgRound]||new Set()).has(cur.id + '|' + lab);
+  // 합답형(ㄱㄴㄷ 보기가 있는 문제)인가 — 그런 문제는 선지가 보기 조합이라 선지에는 단추를 두지 않는다
+  const hasBogi = q => /(^|\n)[ㄱ-ㅎ]\.\s/.test(String(q.question||'').split('§')[1]||'');
 
   function chExp(lab, e) {
     return (
@@ -2219,15 +2253,15 @@ function App() {
                         const sel = userAns === ch;
                         const isAns = answered !== null && cur.answer === ch;
                         return (
-                          <div key={ch} className={`mc-item${chMarked(ch) ? " chm" : ""}`}>
-                            <div className="mc-line">
+                          <div key={ch} className={`mc-item${!hasBogi(cur) && chMarked(ch) ? " chm" : ""}`}>
+                            <div className={`mc-line${hasBogi(cur) ? "" : " has-mark"}`}>
                             <button
                               className={`mc-btn${sel?" sel":""}${isAns?" ans":""}${sel&&!isAns&&answered!==null?" bad":""}${ex[ch]?" has-exp":""}`}
                               onClick={()=>handleAnswer(ch)} disabled={answered!==null}>
                               <span className="mc-no">{ch}</span>
                               <span className="mc-tx">{txt}</span>
                             </button>
-                            {chMarkBtn(ch)}
+                            {!hasBogi(cur) && chMarkBtn(ch)}
                             </div>
                             {ex[ch] && chExp(ch, ex[ch])}
                           </div>
