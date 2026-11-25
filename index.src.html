@@ -1099,6 +1099,34 @@ const MODULE_REGISTRY = [
     ], getData: () => 민사모의26_DATA },
 ];
 
+/* ── 푸는 방식 전환 (OX ↔ 5지선다) ─────────────────────────────
+   OX 지문이 실린 기출을 원래 꼴(제문·선지 다섯)로도 푼다. 뼈대는 법무부·법전협 원본 문제지, 정답은 공식 정답표,
+   해설은 OX 자료에 같은 지문이 있는 선지·보기에만 붙는다(나머지는 정오만). 데이터는 data/<모듈>5지.json.
+   5지선다는 허브에 안 보이는 **짝 모듈**(<모듈>5지)이다 — 진도·오답·이어풀기가 모듈 단위로 저장되므로
+   두 방식의 기록이 섞이지 않고 허브 카드는 하나다. 카드는 마지막에 고른 방식으로 연다.
+   문항 = [id, 문제(제문§보기), 정답, 해설, 주제, 선지, 출처]. 정답이 여럿이면 원문자를 이어 적고(어느 것을 골라도 정답),
+   정답이 없는 문항은 빈칸이다(전부 정답 처리). MC5_PAIRS = [모듈, 문항 수, 부제, 문항이 있는 주제]. */
+const MC5_PAIRS = [["민법총칙", 163, "5지선다 · 변시 1~15회 + 법전협 모의 13~25년 · OX 지문이 실린 기출 163문", ["신의성실의원칙", "권리능력·행위능력", "부재와실종", "법인", "권리능력없는사단", "물건", "법률행위", "의사표시", "대리", "무효와취소", "조건과기한", "소멸시효"]], ["물권법", 239, "5지선다 · 변시 1~15회 + 법전협 모의 13~25년 · OX 지문이 실린 기출 239문", ["물권의소멸·소유권서론기타", "등기제도", "선의취득·동산물권의변동", "물권적청구권", "점유권", "취득시효", "공유·합유·총유", "명의신탁", "지상권·법정지상권", "지역권·전세권", "유치권", "질권", "저당권", "공동저당·특수저당", "가등기담보법"]], ["채권총론", 224, "5지선다 · 변시 1~15회 + 법전협 모의 13~25년 · OX 지문이 실린 기출 224문", ["채권의목적", "채무불이행", "손해배상", "채권자지체", "채권자대위권", "채권자취소권", "채권양도", "채무인수", "변제", "변제자대위", "대물변제공탁경개면제혼동", "상계", "서론분할불가분", "연대채무", "부진정연대채무", "보증채무"]], ["채권각론", 162, "5지선다 · 변시 1~15회 + 법전협 모의 13~25년 · OX 지문이 실린 기출 162문", ["계약의종류·성립", "동시이행의항변권", "위험부담", "제3자를위한계약", "해제", "증여", "매매일반효력", "매도인의담보책임", "민법상임대차", "주택임대차보호법", "상가건물임대차보호법", "도급", "기타전형계약", "부당이득", "일반불법행위", "특수불법행위"]], ["민사소송법", 401, "5지선다 · 변시 1~15회 + 법전협 모의 13~25년 · OX 지문이 실린 기출 401문", ["서론", "신의성실의원칙", "관할", "제척기피회피", "당사자", "소송능력대리인", "소송요건", "공통소의이익", "확인의소", "형성의소", "소의제기", "중복소송", "소멸시효기간준수", "처분권주의", "변론주의", "석명권", "주장항변", "소송상형성권", "불출석기일기간", "송달", "중단수계", "증거재판상자백", "증거조사", "서증", "증명책임", "소송종료선언", "취하", "재소금지", "포기인낙", "재판상화해", "기판력서설작용국면", "기판력시적범위", "기판력객관적범위", "기판력주관적범위", "판결", "청구의병합", "청구의변경", "반소중간확인의소", "공동소송", "보조참가", "독립당사자참가", "임의적당사자변경", "상소", "재심", "민사집행종합"]]];
+const MC5_DATA = {};
+for (const [base, n, sub, keys] of MC5_PAIRS) {
+  const par = MODULE_REGISTRY.find(m => m.id === base);
+  const id = base + "5지";
+  par.mc5 = id;
+  MODULE_REGISTRY.push({ ...par, id, parent: base, hidden: true, mc5: undefined,
+    label: par.label + " · 5지선다", subtitle: sub, count: n,
+    topics: par.topics.filter(t => keys.includes(t.key)), getData: () => MC5_DATA[id] || [] });
+  MODULE_BUILDERS[id] = rows => (MC5_DATA[id] = rows.map(([qid,q,a,e,t,ch,src]) =>
+    ({id:qid, question:q, answer:a, explanation:e, topic:t, star:false, choices:ch, examSource:src})));
+}
+const baseOf  = id => MODULE_REGISTRY.find(m => m.id === id)?.parent || id;
+const solveGet = base => { try { return localStorage.getItem('solve_' + base) === 'mc' ? 'mc' : 'ox'; } catch { return 'ox'; } };
+const solveSet = (base, m) => { try { localStorage.setItem('solve_' + base, m); } catch {} };
+const openIdOf = base => { const p = MODULE_REGISTRY.find(m => m.id === base); return p && p.mc5 && solveGet(base) === 'mc' ? p.mc5 : base; };
+// 5지선다 정답 판정 — 정답이 여럿이면 그중 하나, 정답이 없는 문항(빈칸)은 무엇을 골라도 정답
+// (정답이 아예 안 적힌 문항 — null — 은 예전처럼 아무것도 정답이 아니다: 상법 기말대비 5지선다가 같은 화면을 쓴다)
+const mcOK  = (q, ch) => q.answer == null ? false : q.answer === '' || (q.answer.length > 1 ? q.answer.includes(ch) : q.answer === ch);
+const mcAns = q => q.answer == null ? '—' : q.answer === '' ? '정답 없음 — 전부 정답 처리' : q.answer.length > 1 ? [...q.answer].join('·') + '번 (복수정답)' : q.answer + '번';
+
 // ── 스토리지 키 ──────────────────────────────────────
 const ADMIN_ID = "Sol";
 
@@ -1117,7 +1145,7 @@ const HUB_GROUPS = (() => {
   const used = new Set(plan.flatMap(([, ids]) => ids));
   const byId = id => MODULE_REGISTRY.find(m => m.id === id);
   const groups = plan.map(([label, ids]) => ({ label, mods: ids.map(byId).filter(Boolean) }));
-  const rest = MODULE_REGISTRY.filter(m => !used.has(m.id));
+  const rest = MODULE_REGISTRY.filter(m => !used.has(m.id) && !m.hidden);
   if (rest.length) groups.push({ label: "기타", mods: rest });
   return groups.filter(g => g.mods.length);
 })();
@@ -2438,7 +2466,7 @@ function App() {
   function handleAnswer(choice) {
     if (answered !== null) return;
     const cur = queue[qidx];
-    const correct = choice === cur.answer;
+    const correct = cur.choices ? mcOK(cur, choice) : choice === cur.answer;
     setUserAns(choice); setAnswered(correct ? "ok" : "er"); setShowExp(!!cur.choices);   // 5지선다는 해설을 바로 편다
     const r = cfgRound;
     const np = {
@@ -2977,9 +3005,9 @@ function App() {
               <div className="hub-group" key={g.label}>
               <div className="hub-group-label">{g.label}</div>
               <div className="hub-grid">
-                {g.mods.map(mod => {
-
-
+                {g.mods.map(card => {
+                  // 5지선다 짝이 있는 모듈은 마지막에 고른 방식의 모듈을 보여 주고 연다
+                  const mod = MODULE_REGISTRY.find(m => m.id === openIdOf(card.id)) || card;
                   const isActive = mod.status==="active";
                   const hs = hubStats[mod.id] || {};
                   const wc = hs.wc || 0;
@@ -3002,7 +3030,7 @@ function App() {
                       <div className="module-accent" style={{background:mod.color}}/>
                       {!isActive && <span className="soon-badge">준비중</span>}
                       <div className="module-icon">{mod.icon}</div>
-                      <div className="module-name">{mod.label}</div>
+                      <div className="module-name">{card.label}{mod.parent && <span className="cnt-badge" style={{marginLeft:6,verticalAlign:"middle"}}>5지선다</span>}</div>
                       <div className="module-sub">{mod.subtitle}</div>
                       <div className="module-stats">
                         {isActive ? (
@@ -3229,6 +3257,36 @@ function App() {
                     );
                   })()}
                 </div>
+                {(() => {
+                  const base = MODULE_REGISTRY.find(m => m.id === baseOf(activeModule));
+                  if (!base || !base.mc5) return null;
+                  const pair = MODULE_REGISTRY.find(m => m.id === base.mc5);
+                  const cur = activeModule === base.mc5 ? "mc" : "ox";
+                  const go = m => {
+                    if (m === cur) return;
+                    const to = m === "mc" ? base.mc5 : base.id;
+                    solveSet(base.id, m);
+                    setCfgMode("all"); setCfgTopics([]);
+                    setActiveModule(to); loadModuleData(to);
+                  };
+                  return (
+                    <div className="card">
+                      <div className="card-title">🔀 푸는 방식</div>
+                      <div className="pill-row">
+                        {[["ox","OX", base.count],["mc","5지선다", pair.count]].map(([m,lb,n])=>(
+                          <button key={m} className={`pill ${cur===m?"act":""}`} onClick={()=>go(m)}>
+                            {lb} <span className="cnt-badge">{n}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--tx3)",marginTop:8,lineHeight:1.6}}>
+                        {cur==="mc"
+                          ? "OX 지문이 실린 변시·법전협 모의 문항을 원래 꼴 그대로 다섯 개 중 하나를 고릅니다. 정답은 공식 정답표를 따릅니다. 해설은 OX 자료에 같은 지문이 있는 선지·보기 바로 아래에 있고, 나머지 선지·보기는 정오만 표시합니다. 진도와 오답은 OX와 따로 쌓입니다."
+                          : "OX 지문은 변시·법전협 모의 문항의 선지·보기를 하나씩 떼어 낸 것입니다. 5지선다로 바꾸면 같은 문항을 원래 꼴로 풀 수 있습니다."}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* ── 시간 제한 ── */}
                 <div className="card">
                   <div className="card-title">⏱ 시간 제한</div>
@@ -3453,7 +3511,7 @@ function App() {
                         <span className="rv-verdict">
                           {(() => {
                             // 5지선다는 정답이 원문자, OX 는 참·거짓이라 표시가 다르다
-                            const a = cur.choices ? `${cur.answer}번`
+                            const a = cur.choices ? mcAns(cur)
                                     : (cur.answer ? "○ 옳은 지문" : "× 틀린 지문");
                             return answered==="ok" ? `정답 (${a})` : `${userAns === null ? "시간 초과" : "오답"}. 정답: ${a}`;
                           })()}
@@ -3544,7 +3602,7 @@ function App() {
                       const ex = answered !== null && showExp ? splitExp(cur.explanation).byLabel : {};
                       return cur.choices.map(([ch, txt]) => {
                         const sel = userAns === ch;
-                        const isAns = answered !== null && cur.answer === ch;
+                        const isAns = answered !== null && cur.answer !== '' && mcOK(cur, ch);
                         return (
                           <div key={ch} className={`mc-item${!hasBogi(cur) && chMarked(ch) ? " chm" : ""}`}>
                             <div className={`mc-line${hasBogi(cur) ? "" : " has-mark"}`}>
@@ -3670,7 +3728,7 @@ function App() {
                             onClick={()=>setArchExp(p=>({...p,[k]:!p[k]}))}>
                             <div className="arch-q" style={{whiteSpace:"pre-line"}}>No.{q.id} {String(q.question||"").split("§").map(x => x.trim()).join(String.fromCharCode(10))}</div>
                             {q.star && <span className="star-badge">⭐ 중요</span>}
-                            <div className="arch-ans">정답: {q.choices ? `${q.answer}번` : (q.answer?"○ 옳은 지문":"× 틀린 지문")}</div>
+                            <div className="arch-ans">정답: {q.choices ? mcAns(q) : (q.answer?"○ 옳은 지문":"× 틀린 지문")}</div>
                             <span className="arch-tag">{TOPIC_ICONS[q.topic]||"📌"} {getMod()?.topics.find(t=>t.key===q.topic)?.label||q.topic}</span>
                             {isW&&<span className="arch-tag">오답</span>}
                             {isMk&&<span className="arch-tag mk">🔖 헷갈림</span>}
